@@ -29,6 +29,26 @@ def test_agregar_serie_saldo_promedio_y_tendencia():
     assert fila["tenencia"] == 1
 
 
+def test_agregar_serie_saldo_sin_datos_en_ventana():
+    # Edge case: grupo con snapshot antiguo, nada en la ventana de 6M
+    # fecha_corte global = 2026-06-01, ventana = [2025-12-01, 2026-06-01]
+    # grupo 1: datos en ventana (normal)
+    # grupo 2: solo datos antiguos (2020), nada en ventana
+    # Esperado: grupo 2 tiene saldo_prom_6m y tendencia_6m ambos 0.0 (consistente)
+    df = pd.DataFrame({
+        "numero_id": [1, 1, 2],
+        "fecha": ["2026-01-01", "2026-06-01", "2020-01-01"],
+        "saldo": [100.0, 300.0, 9999.0],
+    })
+    resultado = agregar_serie_saldo(df, group_cols=["numero_id"], meses_ventana=6)
+    # Grupo 2: snapshot preserved, but no data in window
+    fila_grupo2 = resultado[resultado["numero_id"] == 2].iloc[0]
+    assert fila_grupo2["saldo_snapshot"] == 9999.0
+    assert fila_grupo2["saldo_prom_6m"] == 0.0  # sin datos en ventana -> 0, no NaN
+    assert fila_grupo2["tendencia_6m"] == 0.0   # sin datos en ventana -> 0, no NaN
+    assert fila_grupo2["tenencia"] == 1
+
+
 def test_normalizar_producto_inv_virtual_corrige_casing_inconsistente():
     # Valor real en crean_inv_virtual_cdt.db: UTF-8 válido, pero con 'ó' minúscula
     # (U+00F3) en medio de un valor por lo demás en mayúsculas — no es corrupción

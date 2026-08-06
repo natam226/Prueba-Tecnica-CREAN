@@ -26,6 +26,8 @@ def agregar_serie_saldo(df, group_cols, fecha_col="fecha", saldo_col="saldo", me
     tendencia = (segunda_mitad - primera_mitad).rename("tendencia_6m").reset_index()
 
     out = snapshot.merge(prom6m, on=group_cols, how="left").merge(tendencia, on=group_cols, how="left")
+    # Sin datos en la ventana de 6M => representar como 0, no confundir con 'sin snapshot' (que no puede ocurrir)
+    out["saldo_prom_6m"] = out["saldo_prom_6m"].fillna(0.0)
     out["tendencia_6m"] = out["tendencia_6m"].fillna(0.0)
     out["tenencia"] = 1
     return out
