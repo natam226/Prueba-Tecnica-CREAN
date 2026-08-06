@@ -47,6 +47,14 @@ def transformar_producto_unico(tabla_bronce, tabla_plata_destino):
     return resultado
 
 
+def transformar_cdt_inversion_virtual():
+    df = leer_tabla_sqlite(config.BRONCE_DB, "crean_inv_virtual_cdt")
+    df["producto"] = df["producto"].apply(normalizar_producto_inv_virtual).map(MAPA_PRODUCTO_SLUG)
+    resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
+    escribir_tabla_sqlite(resultado, config.PLATA_DB, "cdt_inversion_virtual_plata")
+    return resultado
+
+
 if __name__ == "__main__":
     df = limpiar_clientes()
     print(f"clientes_plata: {len(df)} filas, {df['sin_dato_financiero'].sum()} con sin_dato_financiero")
@@ -55,3 +63,5 @@ if __name__ == "__main__":
     for tabla_bronce, tabla_plata_destino in FUENTES_PRODUCTO_UNICO:
         resultado = transformar_producto_unico(tabla_bronce, tabla_plata_destino)
         print(f"{tabla_plata_destino}: {len(resultado)} filas")
+    cdt_iv = transformar_cdt_inversion_virtual()
+    print(f"cdt_inversion_virtual_plata: {len(cdt_iv)} filas, productos={sorted(cdt_iv['producto'].unique())}")
