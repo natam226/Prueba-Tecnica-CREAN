@@ -55,6 +55,13 @@ def transformar_cdt_inversion_virtual():
     return resultado
 
 
+def transformar_estimador_ingresos():
+    df = leer_tabla_sqlite(config.BRONCE_DB, "estimador_ing")[["numero_id", "estimador_ingreso"]]
+    df["tiene_estimador_ingreso"] = True
+    escribir_tabla_sqlite(df, config.PLATA_DB, "estimador_ingresos_plata")
+    return df
+
+
 if __name__ == "__main__":
     df = limpiar_clientes()
     print(f"clientes_plata: {len(df)} filas, {df['sin_dato_financiero'].sum()} con sin_dato_financiero")
@@ -65,3 +72,5 @@ if __name__ == "__main__":
         print(f"{tabla_plata_destino}: {len(resultado)} filas")
     cdt_iv = transformar_cdt_inversion_virtual()
     print(f"cdt_inversion_virtual_plata: {len(cdt_iv)} filas, productos={sorted(cdt_iv['producto'].unique())}")
+    est = transformar_estimador_ingresos()
+    print(f"estimador_ingresos_plata: {len(est)} filas")
