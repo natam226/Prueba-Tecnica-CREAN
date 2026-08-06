@@ -24,6 +24,7 @@ def _pivotear_producto(clientes_ids, producto):
         "saldo_prom_6m": f"{producto}_saldo_prom_6m",
         "tendencia_6m": f"{producto}_tendencia_6m",
         "tenencia": f"{producto}_tenencia",
+        "n_obs_ventana": f"{producto}_n_obs_ventana",
     })
     return df
 
@@ -34,10 +35,28 @@ def construir_cliente_features():
     for producto in PRODUCTOS:
         df_producto = _pivotear_producto(base["numero_id"], producto)
         base = base.merge(df_producto, on="numero_id", how="left")
-        base[f"{producto}_saldo_snapshot"] = base[f"{producto}_saldo_snapshot"].fillna(0.0)
-        base[f"{producto}_saldo_prom_6m"] = base[f"{producto}_saldo_prom_6m"].fillna(0.0)
-        base[f"{producto}_tendencia_6m"] = base[f"{producto}_tendencia_6m"].fillna(0.0)
+
+        # sin_producto = cliente sin NINGÚN registro para este producto (ausencia real).
+        # Debe capturarse ANTES de rellenar tenencia: agregar_serie_saldo siempre pone
+        # tenencia=1 cuando el grupo plata existe, aunque su ventana de 6M esté vacía,
+        # así que tenencia NaN post-merge es la señal inequívoca de ausencia total.
+        sin_producto = base[f"{producto}_tenencia"].isna()
+
         base[f"{producto}_tenencia"] = base[f"{producto}_tenencia"].fillna(0).astype(int)
+        # saldo_snapshot solo es NaN por ausencia real del producto -> fillna(0.0) incondicional
+        base[f"{producto}_saldo_snapshot"] = base[f"{producto}_saldo_snapshot"].fillna(0.0)
+
+        # saldo_prom_6m / tendencia_6m: rellenar con 0.0 SOLO para ausencia real del producto.
+        # Si el cliente tiene el producto pero su ventana de 6M no tuvo observaciones, el NaN
+        # (heredado de agregar_serie_saldo) debe permanecer: "sin dato" != "confirmado cero".
+        base.loc[sin_producto, f"{producto}_saldo_prom_6m"] = (
+            base.loc[sin_producto, f"{producto}_saldo_prom_6m"].fillna(0.0)
+        )
+        base.loc[sin_producto, f"{producto}_tendencia_6m"] = (
+            base.loc[sin_producto, f"{producto}_tendencia_6m"].fillna(0.0)
+        )
+        # n_obs_ventana: un conteo de 0 es un hecho, siempre seguro de rellenar
+        base[f"{producto}_n_obs_ventana"] = base[f"{producto}_n_obs_ventana"].fillna(0).astype(int)
 
     estimador = leer_tabla_sqlite(config.PLATA_DB, "estimador_ingresos_plata")
     base = base.merge(estimador, on="numero_id", how="left")

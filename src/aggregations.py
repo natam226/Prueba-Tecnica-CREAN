@@ -20,15 +20,25 @@ def agregar_serie_saldo(df, group_cols, fecha_col="fecha", saldo_col="saldo", me
         .mean()
         .rename(columns={saldo_col: "saldo_prom_6m"})
     )
+    n_obs = (
+        ventana.groupby(group_cols, as_index=False)[saldo_col]
+        .count()
+        .rename(columns={saldo_col: "n_obs_ventana"})
+    )
 
     primera_mitad = ventana[ventana[fecha_col] < mitad].groupby(group_cols)[saldo_col].mean()
     segunda_mitad = ventana[ventana[fecha_col] >= mitad].groupby(group_cols)[saldo_col].mean()
     tendencia = (segunda_mitad - primera_mitad).rename("tendencia_6m").reset_index()
 
-    out = snapshot.merge(prom6m, on=group_cols, how="left").merge(tendencia, on=group_cols, how="left")
-    # Sin datos en la ventana de 6M => representar como 0, no confundir con 'sin snapshot' (que no puede ocurrir)
-    out["saldo_prom_6m"] = out["saldo_prom_6m"].fillna(0.0)
-    out["tendencia_6m"] = out["tendencia_6m"].fillna(0.0)
+    out = (
+        snapshot.merge(prom6m, on=group_cols, how="left")
+        .merge(tendencia, on=group_cols, how="left")
+        .merge(n_obs, on=group_cols, how="left")
+    )
+    # Sin datos en la ventana de 6M => dejar NaN real (no se puede calcular), no confundir
+    # "sin observación" con "confirmado plano/cero". n_obs_ventana es el único campo que sí
+    # es seguro rellenar con 0, porque un conteo de 0 es un hecho, no una suposición.
+    out["n_obs_ventana"] = out["n_obs_ventana"].fillna(0).astype(int)
     out["tenencia"] = 1
     return out
 
