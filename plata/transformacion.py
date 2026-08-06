@@ -15,6 +15,12 @@ MAPA_PRODUCTO_SLUG = {
     "INVESBOT": "invesbot",
 }
 
+FUENTES_PRODUCTO_UNICO = [
+    ("crean_bolsillos", "bolsillos_plata"),
+    ("crean_fiducuenta", "fiducuenta_plata"),
+    ("invesbot", "invesbot_plata"),
+]
+
 
 def limpiar_clientes():
     df = leer_tabla_sqlite(config.BRONCE_DB, "clientes")
@@ -33,8 +39,19 @@ def transformar_aho_cte():
     return resultado
 
 
+def transformar_producto_unico(tabla_bronce, tabla_plata_destino):
+    df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
+    df["producto"] = df["producto"].map(MAPA_PRODUCTO_SLUG)
+    resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
+    escribir_tabla_sqlite(resultado, config.PLATA_DB, tabla_plata_destino)
+    return resultado
+
+
 if __name__ == "__main__":
     df = limpiar_clientes()
     print(f"clientes_plata: {len(df)} filas, {df['sin_dato_financiero'].sum()} con sin_dato_financiero")
     aho = transformar_aho_cte()
     print(f"aho_cte_plata: {len(aho)} filas, productos={sorted(aho['producto'].unique())}")
+    for tabla_bronce, tabla_plata_destino in FUENTES_PRODUCTO_UNICO:
+        resultado = transformar_producto_unico(tabla_bronce, tabla_plata_destino)
+        print(f"{tabla_plata_destino}: {len(resultado)} filas")
