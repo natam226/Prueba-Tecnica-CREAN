@@ -1,4 +1,7 @@
 # bronce/extraccion.py
+import os
+import shutil
+import stat
 import sys
 from pathlib import Path
 
@@ -6,6 +9,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
 from src.db_io import extraer_zip_a_db, leer_tabla_sqlite, escribir_tabla_sqlite
+
+
+def _limpiar_solo_lectura(func, path, exc_info):
+    # onerror de shutil.rmtree: en Windows (y en particular en carpetas sincronizadas
+    # por OneDrive) los directorios recién creados pueden quedar con el atributo
+    # de solo-lectura, lo que hace fallar rmdir/unlink con PermissionError incluso
+    # tras haber borrado todo el contenido. Se limpia el atributo y se reintenta.
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 
 FUENTES = [
     ("clientes.zip", "clientes.db", "clientes"),
@@ -27,6 +40,11 @@ def main():
         df = leer_tabla_sqlite(db_path, tabla)
         escribir_tabla_sqlite(df, config.BRONCE_DB, tabla)
         print(f"{tabla}: {len(df)} filas -> bronce.db")
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(staging, onexc=_limpiar_solo_lectura)
+    else:
+        shutil.rmtree(staging, onerror=_limpiar_solo_lectura)
 
 
 if __name__ == "__main__":

@@ -26,13 +26,12 @@ def reporte_duplicados_clientes(df):
 def reporte_encoding_producto(nombre_tabla, df):
     if "producto" not in df.columns:
         return []
-    # Detectar productos con caracteres no-ASCII o replacement character
+    # Detectar productos con caracteres no-ASCII (p.ej. tildes) — UTF-8 válido, no corrupción de bytes
     sospechosos = df.loc[
-        df["producto"].str.contains(r"[^\x00-\x7F]", na=False, regex=True) |
-        df["producto"].str.contains("�", na=False),
+        df["producto"].str.contains(r"[^\x00-\x7F]", na=False, regex=True),
         "producto"
     ].unique().tolist()
-    return [f"## Encoding de producto en {nombre_tabla}", f"- valores con byte inválido: {sospechosos}"]
+    return [f"## Anomalías de texto en producto en {nombre_tabla}", f"- valores con caracteres no-ASCII: {sospechosos}"]
 
 
 def reporte_integridad_referencial(nombre_tabla, df, ids_clientes):

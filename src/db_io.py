@@ -16,11 +16,21 @@ def extraer_zip_a_db(zip_path: Path, destino_dir: Path) -> Path:
 
 
 def leer_tabla_sqlite(db_path: Path, tabla: str) -> pd.DataFrame:
-    with sqlite3.connect(db_path) as con:
+    # sqlite3.Connection usado como context manager solo hace commit/rollback,
+    # NO cierra la conexión (gotcha del stdlib) — se cierra explícitamente para
+    # no dejar el archivo bloqueado en Windows (p.ej. impide limpiar _staging/).
+    con = sqlite3.connect(db_path)
+    try:
         return pd.read_sql(f'SELECT * FROM "{tabla}"', con)
+    finally:
+        con.close()
 
 
 def escribir_tabla_sqlite(df: pd.DataFrame, db_path: Path, tabla: str, if_exists: str = "replace") -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as con:
+    con = sqlite3.connect(db_path)
+    try:
         df.to_sql(tabla, con, if_exists=if_exists, index=False)
+        con.commit()
+    finally:
+        con.close()

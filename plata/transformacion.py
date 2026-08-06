@@ -32,8 +32,10 @@ def limpiar_clientes():
 
 
 def transformar_aho_cte():
-    df = leer_tabla_sqlite(config.BRONCE_DB, "crean_aho_cte")
+    tabla_bronce = "crean_aho_cte"
+    df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].map(MAPA_PRODUCTO_SLUG)
+    assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
     resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, "aho_cte_plata")
     return resultado
@@ -42,14 +44,17 @@ def transformar_aho_cte():
 def transformar_producto_unico(tabla_bronce, tabla_plata_destino):
     df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].map(MAPA_PRODUCTO_SLUG)
+    assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
     resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, tabla_plata_destino)
     return resultado
 
 
 def transformar_cdt_inversion_virtual():
-    df = leer_tabla_sqlite(config.BRONCE_DB, "crean_inv_virtual_cdt")
+    tabla_bronce = "crean_inv_virtual_cdt"
+    df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].apply(normalizar_producto_inv_virtual).map(MAPA_PRODUCTO_SLUG)
+    assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
     resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, "cdt_inversion_virtual_plata")
     return resultado

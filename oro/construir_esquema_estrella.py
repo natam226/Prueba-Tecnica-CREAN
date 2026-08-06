@@ -23,13 +23,24 @@ def construir_esquema_estrella():
     escribir_tabla_sqlite(dim_producto, config.ORO_DB, "dim_producto")
 
     fact_saldos["fecha_snapshot"] = pd.to_datetime(fact_saldos["fecha_snapshot"])
-    dim_tiempo = fact_saldos[["fecha_snapshot"]].drop_duplicates().rename(columns={"fecha_snapshot": "fecha"})
+    dim_tiempo = (
+        fact_saldos[["fecha_snapshot"]]
+        .drop_duplicates()
+        .sort_values("fecha_snapshot")
+        .rename(columns={"fecha_snapshot": "fecha"})
+        .reset_index(drop=True)
+    )
+    dim_tiempo["fecha_id"] = range(1, len(dim_tiempo) + 1)
     dim_tiempo["anio"] = dim_tiempo["fecha"].dt.year
     dim_tiempo["mes"] = dim_tiempo["fecha"].dt.month
     dim_tiempo["trimestre"] = dim_tiempo["fecha"].dt.quarter
     escribir_tabla_sqlite(dim_tiempo, config.ORO_DB, "dim_tiempo")
 
     fact_saldos = fact_saldos.merge(dim_producto, on="producto", how="left")
+    fact_saldos = fact_saldos.merge(
+        dim_tiempo[["fecha", "fecha_id"]],
+        left_on="fecha_snapshot", right_on="fecha", how="left",
+    ).drop(columns=["fecha"])
     escribir_tabla_sqlite(fact_saldos, config.ORO_DB, "fact_saldos")
     return dim_cliente, dim_producto, dim_tiempo, fact_saldos
 

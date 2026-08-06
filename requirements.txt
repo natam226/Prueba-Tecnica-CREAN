@@ -6,3 +6,4 @@ seaborn>=0.13
 jupyter>=1.0
 pyarrow>=15.0
 pytest>=8.0
+joblib>=1.3
