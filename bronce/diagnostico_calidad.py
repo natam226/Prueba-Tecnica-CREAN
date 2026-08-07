@@ -40,27 +40,42 @@ def reporte_integridad_referencial(nombre_tabla, df, ids_clientes):
 
 
 def verificar_unicidad_producto_fecha(df, nombre_tabla):
-    """SPEC_V2 §9.1: (numero_id, producto, fecha) debe ser único."""
+    """SPEC_V2 §9.1: (numero_id, producto, fecha) debe ser único.
+
+    Si falta alguna de las tres columnas clave, el chequeo NO puede
+    realizarse: se devuelve `unico=None` y `verificado=False` para que
+    esto sea distinguible de una verificación real que pasó (`unico=True`).
+    Un `unico=True` aquí significaría "no encontré duplicados" incluso
+    cuando en realidad no se buscó nada, lo cual sería peor que no reportar.
+    """
     claves = ["numero_id", "producto", "fecha"]
     presentes = [c for c in claves if c in df.columns]
     if len(presentes) < 3:
-        return {"tabla": nombre_tabla, "duplicados": 0, "unico": True,
-                "nota": f"columnas ausentes: {set(claves) - set(presentes)}"}
+        faltantes = set(claves) - set(presentes)
+        return {"tabla": nombre_tabla, "duplicados": 0, "unico": None, "verificado": False,
+                "nota": f"no verificado: columnas ausentes: {faltantes}"}
     dup = int(df.duplicated(subset=claves).sum())
-    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0}
+    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0, "verificado": True}
 
 
 def verificar_unicidad_cliente(df, nombre_tabla):
     """SPEC_V2 §9.2: numero_id único."""
     dup = int(df["numero_id"].duplicated().sum())
-    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0}
+    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0, "verificado": True}
+
+
+def _estado_granularidad(r):
+    if not r.get("verificado", True):
+        return f"NO VERIFICADO ({r.get('nota', 'sin detalle')})"
+    if r["unico"]:
+        return "OK"
+    return f"FALLA ({r['duplicados']} duplicados)"
 
 
 def reporte_granularidad(resultados):
     lineas = ["## Granularidad (SPEC_V2 §9)"]
     for r in resultados:
-        estado = "OK" if r["unico"] else f"FALLA ({r['duplicados']} duplicados)"
-        lineas.append(f"- {r['tabla']}: {estado}")
+        lineas.append(f"- {r['tabla']}: {_estado_granularidad(r)}")
     return lineas
 
 
@@ -94,7 +109,7 @@ def main():
     salida.write_text("\n".join(lineas), encoding="utf-8")
     print(f"Reporte escrito en {salida}")
     for r in granularidad:
-        print(f"  {r['tabla']}: {'OK' if r['unico'] else 'DUPLICADOS=' + str(r['duplicados'])}")
+        print(f"  {r['tabla']}: {_estado_granularidad(r)}")
 
 
 if __name__ == "__main__":

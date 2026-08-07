@@ -32,6 +32,16 @@ def test_verificar_unicidad_producto_fecha_acepta_grano_correcto():
     assert verificar_unicidad_producto_fecha(df, "sintetica")["unico"] is True
 
 
+def test_verificar_unicidad_producto_fecha_columna_ausente_no_se_marca_como_verificado():
+    """Si falta 'producto' o 'fecha', el chequeo no puede realizarse: debe ser
+    distinguible de una verificación real que pasó, no un falso 'unico=True'."""
+    df = pd.DataFrame({"numero_id": [1, 1], "saldo": [1.0, 2.0]})  # sin producto ni fecha
+    r = verificar_unicidad_producto_fecha(df, "sintetica")
+    assert r["verificado"] is False
+    assert r["unico"] is None
+    assert "producto" in r["nota"] and "fecha" in r["nota"]
+
+
 def test_verificar_unicidad_cliente():
     assert verificar_unicidad_cliente(pd.DataFrame({"numero_id": [1, 2]}), "t")["unico"] is True
     assert verificar_unicidad_cliente(pd.DataFrame({"numero_id": [1, 1]}), "t")["unico"] is False
@@ -42,7 +52,12 @@ def test_verificar_unicidad_cliente():
 def test_bronce_unico_por_cliente_producto_fecha(tabla):
     """SPEC_V2 §9.1"""
     r = verificar_unicidad_producto_fecha(leer_tabla_sqlite(config.BRONCE_DB, tabla), tabla)
-    assert r["unico"], f"{tabla}: {r['duplicados']} combinaciones (id, producto, fecha) repetidas"
+    # r["unico"] es None si el chequeo no pudo ejecutarse (falta una columna clave) y
+    # False si se ejecutó y encontró duplicados; en ambos casos debe fallar, no pasar en silencio.
+    assert r["unico"], (
+        f"{tabla}: verificado={r.get('verificado')}, duplicados={r['duplicados']}, "
+        f"nota={r.get('nota', '(sin nota, se ejecutó el chequeo)')}"
+    )
 
 
 @pytest.mark.skipif(not config.ORO_DB.exists(), reason="oro.db no construido")
