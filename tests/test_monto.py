@@ -71,9 +71,23 @@ def test_mae_mape_ignora_nan():
     assert r["mae"] == pytest.approx(10.0)
 
 
+def test_mae_mape_incluye_mediana_ape_robusta_a_cola():
+    """Amendment SPEC_V2 §6.3.4 (DECISIONES.md clave=metrica_error_monto): la
+    MEDIA del APE la domina un solo ratio extremo (real casi 0); la MEDIANA no."""
+    # reales = [100, 100, 100, 100, 1.0] -> el ultimo real casi-cero con un
+    # error grande dispara la media pero no la mediana.
+    reales = [100.0, 100.0, 100.0, 100.0, 1.0]
+    preds = [110.0, 110.0, 110.0, 110.0, 500.0]   # ratios: .10,.10,.10,.10, 499.0
+    r = mae_mape(reales, preds, eps=0.5)
+    assert r["n_mape"] == 5
+    assert r["mape_mediana"] == pytest.approx(0.10)
+    assert r["mape"] > 50.0          # la media SI se dispara por la cola
+
+
 def test_escenarios_ordenan_conservador_base_optimista():
-    """SPEC_V2 §6.3.5: conservador = p25 del error, base = predicción, optimista = p75."""
-    errores = np.array([-50.0, -20.0, 0.0, 20.0, 50.0])   # p25=-20, p75=20
+    """SPEC_V2 §6.3.5: conservador = p25 del error, base = predicción recentrada
+    por la mediana del error, optimista = p75."""
+    errores = np.array([-50.0, -20.0, 0.0, 20.0, 50.0])   # p25=-20, mediana=0, p75=20
     r = escenarios_desde_errores(pd.Series([1000.0, 2000.0]), errores)
     assert r.loc[0, "base"] == 1000.0
     assert r.loc[0, "conservador"] == pytest.approx(980.0)
@@ -85,3 +99,38 @@ def test_escenarios_ordenan_conservador_base_optimista():
 def test_escenarios_conservan_el_indice():
     r = escenarios_desde_errores(pd.Series([10.0], index=[7]), np.array([-1.0, 1.0]))
     assert r.index.tolist() == [7]
+
+
+def test_escenarios_recentran_base_cuando_hay_sesgo_sistematico():
+    """Diagnostico monto_12m: el modelo sobre-predice de forma sistematica
+    (mediana del error negativa) -- 'base' debe recentrarse por esa mediana,
+    no quedarse en la prediccion cruda, o arrastraria el sesgo al negocio."""
+    errores = np.array([-100.0, -90.0, -80.0, -10.0, -5.0])   # todo negativo
+    r = escenarios_desde_errores(pd.Series([1000.0]), errores, p_bajo=10, p_alto=90)
+    mediana_error = -80.0
+    assert r.loc[0, "base"] == pytest.approx(1000.0 + mediana_error)
+    assert r.loc[0, "base"] < 1000.0    # ya no es la prediccion cruda sin corregir
+    assert r.loc[0, "conservador"] <= r.loc[0, "base"] <= r.loc[0, "optimista"]
+
+
+def test_escenarios_orden_garantizado_incluso_con_banda_de_ancho_cero():
+    """Reproduce el caso 'app' de monto_12m: 78%+ de los errores son el MISMO
+    valor negativo (masa de empates), colapsando p10==p50==p90. El orden
+    conservador <= base <= optimista debe seguir cumpliendose (con igualdad),
+    no romperse -- es la garantia por construccion que motivo el fix."""
+    errores = np.array([-65253.23] * 8 + [-10.0, 5.0])
+    r = escenarios_desde_errores(pd.Series([1_000_000.0]), errores, p_bajo=10, p_alto=90)
+    assert r.loc[0, "conservador"] <= r.loc[0, "base"] <= r.loc[0, "optimista"]
+    # banda degenerada: p10 == mediana en este caso concreto
+    assert r.loc[0, "conservador"] == pytest.approx(r.loc[0, "base"])
+
+
+def test_escenarios_p10_p90_ensancha_banda_respecto_a_p25_p75():
+    errores = np.random.RandomState(0).normal(loc=-1000.0, scale=500.0, size=1000)
+    estrecha = escenarios_desde_errores(pd.Series([0.0]), errores, p_bajo=25, p_alto=75)
+    ancha = escenarios_desde_errores(pd.Series([0.0]), errores, p_bajo=10, p_alto=90)
+    ancho_estrecho = estrecha.loc[0, "optimista"] - estrecha.loc[0, "conservador"]
+    ancho_ancho = ancha.loc[0, "optimista"] - ancha.loc[0, "conservador"]
+    assert ancho_ancho > ancho_estrecho
+    # ambas bandas deben quedar correctamente ordenadas y centradas en la misma mediana
+    assert estrecha.loc[0, "base"] == pytest.approx(ancha.loc[0, "base"])

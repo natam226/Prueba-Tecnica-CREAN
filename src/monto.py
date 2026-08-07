@@ -44,46 +44,83 @@ def split_backtesting_temporal(panel: pd.DataFrame, col_mes: str,
 
 
 def mae_mape(y_real, y_pred, eps: float = 1.0) -> dict:
-    """MAE y MAPE (SPEC_V2 §6.3.4).
+    """MAE y MAPE (SPEC_V2 §6.3.4) + `mape_mediana` (amendment, ver DECISIONES.md
+    clave=`metrica_error_monto`).
 
     El MAPE excluye los casos con |real| <= eps: con saldos que valen 0 el
     porcentaje de error es indefinido y una sola fila lo llevaría a infinito.
     Se reporta `n_mape` para que quede claro sobre cuántos casos se calculó.
+
+    `mape` (la MEDIA de los ratios de error absoluto) NO es una métrica fiable
+    cuando la mayoría de la población tiene crecimiento real cercano a cero: un
+    puñado de ratios extremos (real casi 0, error grande) domina la media y la
+    dispara a órdenes de magnitud sin sentido de negocio -- subir `eps` no lo
+    arregla, porque el problema es la forma de la distribución, no el umbral.
+    `mape_mediana` (la MEDIANA de los mismos ratios) es robusta a esa cola y es
+    la que se debe reportar como cifra de negocio; `mape` se conserva por
+    compatibilidad y como evidencia de por qué se necesitó el amendment.
     """
     real = np.asarray(y_real, dtype=float)
     pred = np.asarray(y_pred, dtype=float)
     ok = np.isfinite(real) & np.isfinite(pred)
     if not ok.any():
-        return {"mae": float("nan"), "mape": float("nan"), "n": 0, "n_mape": 0}
+        return {"mae": float("nan"), "mape": float("nan"), "mape_mediana": float("nan"),
+                "n": 0, "n_mape": 0}
 
     real_ok, pred_ok = real[ok], pred[ok]
     mae = float(np.mean(np.abs(real_ok - pred_ok)))
 
     denom = np.abs(real_ok)
     validos = denom > eps
-    mape = (float(np.mean(np.abs((real_ok[validos] - pred_ok[validos]) / denom[validos])))
-            if validos.any() else float("nan"))
-    return {"mae": mae, "mape": mape, "n": int(ok.sum()), "n_mape": int(validos.sum())}
+    if validos.any():
+        ape = np.abs((real_ok[validos] - pred_ok[validos]) / denom[validos])
+        mape = float(np.mean(ape))
+        mape_mediana = float(np.median(ape))
+    else:
+        mape = float("nan")
+        mape_mediana = float("nan")
+    return {"mae": mae, "mape": mape, "mape_mediana": mape_mediana,
+            "n": int(ok.sum()), "n_mape": int(validos.sum())}
 
 
 def escenarios_desde_errores(predicciones, errores, p_bajo: float = 25,
                              p_alto: float = 75) -> pd.DataFrame:
     """Tres escenarios a partir de la distribución empírica del error de backtest.
 
-    Convención de signo: error = real − predicho. El escenario conservador suma
-    el percentil bajo del error (típicamente negativo) y el optimista el alto.
+    Convención de signo: error = real − predicho.
+
+    `base` se RECENTRA por la MEDIANA del error, no se deja en la predicción
+    cruda: si el modelo sobre-predice sistemáticamente (mediana del error
+    negativa, como ocurre en el backtest de monto_12m -- ver DECISIONES.md
+    clave=`metrica_error_monto`), usar la predicción cruda como "base" arrastra
+    ese sesgo a la cifra central. `conservador` y `optimista` son la predicción
+    RECENTRADA más los percentiles p_bajo/p_alto del error alrededor de esa
+    misma mediana (no alrededor de la predicción cruda).
+
+    Como p_bajo <= mediana <= p_alto por definición de percentil (para
+    p_bajo <= 50 <= p_alto), el orden conservador <= base <= optimista queda
+    GARANTIZADO por construcción -- no depende de que la distribución de
+    errores del backtest resulte simétrica. El default p_bajo=25/p_alto=75 es
+    conservador en el sentido de banda estrecha: cuando la distribución de
+    error está muy concentrada (mucha masa de empates, como en el componente
+    `app` de monto_12m) puede colapsar p_bajo==p_alto en una banda de ancho
+    cero. `notebooks/06_monto_12m.ipynb` llama esta función con p_bajo=10,
+    p_alto=90 explícitamente por esa razón (DECISIONES.md,
+    clave=`metrica_error_monto`); el default de 25/75 se deja sin cambiar aquí
+    para no romper el contrato de quien ya llama esta función sin argumentos.
     """
     pred = pd.Series(predicciones).astype("float64")
     err = np.asarray(errores, dtype=float)
     err = err[np.isfinite(err)]
     if err.size == 0:
-        lo = hi = 0.0
+        lo = mediana = hi = 0.0
     else:
         lo = float(np.percentile(err, p_bajo))
+        mediana = float(np.percentile(err, 50))
         hi = float(np.percentile(err, p_alto))
 
     return pd.DataFrame({
         "conservador": pred + lo,
-        "base": pred,
+        "base": pred + mediana,
         "optimista": pred + hi,
     }, index=pred.index)
