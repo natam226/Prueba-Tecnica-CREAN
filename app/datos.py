@@ -55,10 +55,54 @@ def base_clientes() -> pd.DataFrame:
     return datos
 
 
+# Qué hay que ejecutar para producir cada artefacto. Sin este mapa el aviso
+# diría "falta un archivo" y dejaría al lector adivinando cuál de los diez
+# pasos del pipeline se saltó.
+PRODUCTOR = {
+    "eda/resumen_shape.json": "notebooks/01_eda.ipynb",
+    "eda/tasas_adopcion_por_segmento.csv": "notebooks/01_eda.ipynb",
+    "eda/faltantes_tasa_adopcion.csv": "notebooks/03_eda_faltantes.ipynb",
+    "eda/validacion_variables.csv": "notebooks/04_validacion_variables.ipynb",
+    "eda/resumen_ejecutivo.json": "notebooks/05_dimensionamiento.ipynb",
+    "models/metricas_propension.json": "notebooks/02_modelado.ipynb",
+    "models/curva_precision_recall.csv": "notebooks/02_modelado.ipynb",
+    "powerbi/dimensionamiento.csv": "notebooks/05_dimensionamiento.ipynb",
+    "powerbi/fact_auditoria_sesgo.csv": "notebooks/07_auditoria_sesgo.ipynb",
+    "powerbi/fact_cliente_score.csv": "scripts/export_powerbi.py",
+    "powerbi/dim_cliente.csv": "scripts/export_powerbi.py",
+    "powerbi/fact_importancia_variables.csv": "scripts/export_powerbi.py",
+    "decisiones/log_decisiones.csv": "cualquier notebook del pipeline",
+}
+
+
+def _quien_lo_produce(ruta: str) -> str:
+    return PRODUCTOR.get(ruta, "algún paso del pipeline (ver el README)")
+
+
 def aviso_faltan_artefactos(error: Exception) -> None:
+    """El tablero no puede arrancar: falta algo que necesitan todas las vistas."""
+    ruta = str(error)
     st.error(
-        f"Falta un artefacto del pipeline: `{error}`\n\n"
+        f"**El pipeline no ha corrido todavía.**\n\n"
+        f"Falta `{ruta}`, que produce `{_quien_lo_produce(ruta)}`.\n\n"
         "Ejecutar en orden: `python scripts/run_pipeline.py`, los notebooks "
         "01 a 07 según el README, y `python scripts/export_powerbi.py`."
+    )
+    st.stop()
+
+
+def aviso_vista_incompleta(error: Exception, vista: str) -> None:
+    """Falta un artefacto de UNA vista: el resto del tablero sigue sirviendo.
+
+    Un paso del pipeline saltado no debe tumbar el tablero entero con un
+    traceback de Python: la vista afectada dice qué le falta y las demás
+    siguen funcionando.
+    """
+    ruta = str(error)
+    st.warning(
+        f"**La vista «{vista}» necesita un artefacto que aún no existe.**\n\n"
+        f"Falta `{ruta}`, que produce `{_quien_lo_produce(ruta)}`.\n\n"
+        "Las demás vistas del tablero no dependen de este archivo y siguen "
+        "disponibles en el menú de la izquierda."
     )
     st.stop()

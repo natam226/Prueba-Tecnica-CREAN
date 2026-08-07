@@ -58,7 +58,7 @@ with st.sidebar:
 # ===========================================================================
 # Resumen
 # ===========================================================================
-if vista == "Resumen":
+def vista_resumen():
     st.title("Potencial de adopción de la App de inversiones")
     st.markdown(
         "Solución analítica sobre 7 fuentes del banco para **identificar los "
@@ -128,7 +128,7 @@ if vista == "Resumen":
 # ===========================================================================
 # Caracterización
 # ===========================================================================
-elif vista == "Caracterización":
+def vista_caracterizacion():
     st.title("Caracterización de la base")
     st.markdown("**¿Quiénes son los clientes y qué distingue a los que ya invierten?**")
 
@@ -227,7 +227,7 @@ elif vista == "Caracterización":
 # ===========================================================================
 # Modelos
 # ===========================================================================
-elif vista == "Modelos":
+def vista_modelos():
     st.title("Modelos analíticos")
     st.markdown("**¿Cómo se predice la adopción y qué tan bien funciona?**")
 
@@ -363,7 +363,7 @@ elif vista == "Modelos":
 # ===========================================================================
 # Oportunidad
 # ===========================================================================
-elif vista == "Oportunidad":
+def vista_oportunidad():
     st.title("Dimensionamiento de la oportunidad")
     st.markdown("**¿Cuánto volumen puede canalizar la App en 12 meses?**")
 
@@ -485,7 +485,7 @@ elif vista == "Oportunidad":
 # ===========================================================================
 # Priorización
 # ===========================================================================
-elif vista == "Priorización":
+def vista_priorizacion():
     st.title("Lista de contacto priorizada")
     st.markdown("**¿A quién llama el equipo comercial el lunes?**")
 
@@ -579,7 +579,7 @@ elif vista == "Priorización":
 # ===========================================================================
 # Sesgo y supuestos
 # ===========================================================================
-else:
+def vista_sesgo_y_supuestos():
     st.title("Auditoría de sesgo y supuestos")
     st.markdown("**¿Qué puede salir mal y qué estamos asumiendo?**")
 
@@ -660,3 +660,24 @@ else:
                      hide_index=True, width="stretch", height=340)
     except dat.ArtefactosFaltantes:
         st.info("El log de decisiones se genera al ejecutar los notebooks.")
+
+
+# ===========================================================================
+# Despacho
+# ===========================================================================
+# Cada vista carga sus propios artefactos. Si falta uno -- porque alguien
+# ejecuto el pipeline a medias -- el guardian lo convierte en un aviso de esa
+# vista en vez de un traceback que tumba el tablero entero.
+VISTA_FN = {
+    "Resumen": vista_resumen,
+    "Caracterización": vista_caracterizacion,
+    "Modelos": vista_modelos,
+    "Oportunidad": vista_oportunidad,
+    "Priorización": vista_priorizacion,
+    "Sesgo y supuestos": vista_sesgo_y_supuestos,
+}
+
+try:
+    VISTA_FN[vista]()
+except dat.ArtefactosFaltantes as e:
+    dat.aviso_vista_incompleta(e, vista)
