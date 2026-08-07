@@ -19,7 +19,8 @@ from src.fecha_corte import calcular_fecha_corte
 PRODUCTOS = config.PRODUCTOS
 BLOQUES_PERFIL = ["falta_estimador", "falta_vivienda", "falta_financiero"]
 
-# Leak-fix (ver .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+# Corrección de fuga de etiqueta (ver la clave `fuga_recencia_antiguedad`
+# en outputs/decisiones/log_decisiones.csv):
 # fuentes admitidas para `dias_desde_ultimo_dato`/`sin_dato_reciente` (D0) y,
 # vía plata/transformacion.py::construir_primer_registro, para
 # `antiguedad_relacion_meses` (D8). Invesbot / Inversión Virtual quedan
@@ -63,8 +64,8 @@ def agregar_recencia_dato(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.D
     hacía que, para ~31% de los adoptantes, "hace cuánto vimos a este
     cliente" fuera en realidad "hace cuánto se registró su snapshot de
     Invesbot/Inversión Virtual" -- una función directa de `etiqueta_adopcion`
-    (ver .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md
-    §3). Un cliente sin NINGUNA fila de producto no-etiqueta queda en NULO +
+    (ver la clave `fuga_recencia_antiguedad` en el log de decisiones). Un
+    cliente sin NINGUNA fila de producto no-etiqueta queda en NULO +
     bandera `sin_dato_reciente`, nunca en 0 ni en un valor grande arbitrario;
     esto incluye, deliberadamente, al cliente cuyo ÚNICO dato está en
     Invesbot/Inversión Virtual -- no hay señal de recencia no-etiqueta para
@@ -220,8 +221,8 @@ def construir_cliente_features():
     base["cv_saldo_liquido_insuficiente"] = (
         base["cv_saldo_liquido_insuficiente"].fillna(1).astype(int))
 
-    # D8 (AMENDADA por el leak-fix de
-    # .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+    # D8 (AMENDADA por la corrección de fuga; ver la clave
+    # `fuga_recencia_antiguedad` en el log de decisiones):
     # antigüedad de la relación = meses entre FECHA_CORTE global y el primer
     # registro del cliente en cualquier fuente NO-etiqueta (contra
     # FECHA_CORTE explícitamente, no contra "el mes máximo del panel"). La

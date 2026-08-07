@@ -1,6 +1,6 @@
 # DECISIONES — Resolución de preguntas abiertas
 
-Este documento resuelve las preguntas marcadas como PROVISIONAL por Claude Code.
+Este documento resuelve las preguntas marcadas como PROVISIONAL en la especificación.
 Tiene precedencia sobre las decisiones provisionales del plan. Donde una decisión
 aquí contradiga SPEC.md o SPEC_V2.md, vale esta.
 

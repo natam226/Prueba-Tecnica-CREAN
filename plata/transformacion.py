@@ -140,8 +140,8 @@ def construir_primer_registro():
     """Primer mes con registro del cliente en fuentes de saldo NO-etiqueta.
     Insumo de `antiguedad_relacion_meses` (SPEC_V2 §5, D8).
 
-    D8 AMENDADA (leak-fix, ver
-    .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+    D8 AMENDADA (corrección de fuga; ver la clave
+    `fuga_recencia_antiguedad` en el log de decisiones):
     la redacción original decía "primer registro del cliente en CUALQUIER
     fuente". Ese MIN incluía a Invesbot/Inversión Virtual
     (`config.PRODUCTOS_ETIQUETA`), los dos productos que DEFINEN
