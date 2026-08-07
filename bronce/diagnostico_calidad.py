@@ -39,6 +39,31 @@ def reporte_integridad_referencial(nombre_tabla, df, ids_clientes):
     return [f"## Integridad referencial {nombre_tabla}", f"- numero_id sin match en clientes: {len(faltantes)}"]
 
 
+def verificar_unicidad_producto_fecha(df, nombre_tabla):
+    """SPEC_V2 §9.1: (numero_id, producto, fecha) debe ser único."""
+    claves = ["numero_id", "producto", "fecha"]
+    presentes = [c for c in claves if c in df.columns]
+    if len(presentes) < 3:
+        return {"tabla": nombre_tabla, "duplicados": 0, "unico": True,
+                "nota": f"columnas ausentes: {set(claves) - set(presentes)}"}
+    dup = int(df.duplicated(subset=claves).sum())
+    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0}
+
+
+def verificar_unicidad_cliente(df, nombre_tabla):
+    """SPEC_V2 §9.2: numero_id único."""
+    dup = int(df["numero_id"].duplicated().sum())
+    return {"tabla": nombre_tabla, "duplicados": dup, "unico": dup == 0}
+
+
+def reporte_granularidad(resultados):
+    lineas = ["## Granularidad (SPEC_V2 §9)"]
+    for r in resultados:
+        estado = "OK" if r["unico"] else f"FALLA ({r['duplicados']} duplicados)"
+        lineas.append(f"- {r['tabla']}: {estado}")
+    return lineas
+
+
 def main():
     clientes = leer_tabla_sqlite(config.BRONCE_DB, "clientes")
     ids_clientes = set(clientes["numero_id"].unique())
@@ -47,18 +72,29 @@ def main():
     lineas += reporte_nulos_clientes(clientes)
     lineas += reporte_duplicados_clientes(clientes)
 
+    granularidad = []
     for tabla in TABLAS_SALDO:
         df = leer_tabla_sqlite(config.BRONCE_DB, tabla)
         lineas += reporte_encoding_producto(tabla, df)
         lineas += reporte_integridad_referencial(tabla, df, ids_clientes)
+        granularidad.append(verificar_unicidad_producto_fecha(df, tabla))
 
     estimador = leer_tabla_sqlite(config.BRONCE_DB, "estimador_ing")
     lineas += reporte_integridad_referencial("estimador_ing", estimador, ids_clientes)
+    granularidad.append(verificar_unicidad_cliente(estimador, "estimador_ing"))
+
+    if config.ORO_DB.exists():
+        cf = leer_tabla_sqlite(config.ORO_DB, "cliente_features")
+        granularidad.append(verificar_unicidad_cliente(cf, "cliente_features"))
+
+    lineas += reporte_granularidad(granularidad)
 
     salida = config.OUTPUTS_DIR / "quality" / "reporte_calidad.md"
     salida.parent.mkdir(parents=True, exist_ok=True)
     salida.write_text("\n".join(lineas), encoding="utf-8")
     print(f"Reporte escrito en {salida}")
+    for r in granularidad:
+        print(f"  {r['tabla']}: {'OK' if r['unico'] else 'DUPLICADOS=' + str(r['duplicados'])}")
 
 
 if __name__ == "__main__":
