@@ -1,8 +1,11 @@
 # oro/construir_cliente_features.py
+import json
+
 import pandas as pd
 
 import config
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
+from src.decisiones import decidir_perfil_incompleto
 from src.derivadas import (
     agregar_agregados_producto,
     agregar_banderas_faltantes,
@@ -14,6 +17,7 @@ from src.derivadas import (
 from src.fecha_corte import calcular_fecha_corte
 
 PRODUCTOS = config.PRODUCTOS
+BLOQUES_PERFIL = ["falta_estimador", "falta_vivienda", "falta_financiero"]
 
 # Leak-fix (ver .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
 # fuentes admitidas para `dias_desde_ultimo_dato`/`sin_dato_reciente` (D0) y,
@@ -92,6 +96,33 @@ def agregar_etiqueta_adopcion_reciente(base: pd.DataFrame, fecha_corte: pd.Times
         & ((fecha_corte - out["inversion_virtual_fecha_snapshot"]).dt.days <= ventana)
     ).fillna(False)
     out["etiqueta_adopcion_reciente"] = (reciente_invesbot | reciente_iv).astype(int)
+    return out
+
+
+def _lift_medido_desde_eda():
+    """Lee el lift condicional (D7) medido por notebooks/03_eda_faltantes.ipynb.
+    Si el notebook aún no se ha ejecutado, devuelve None: la bandera no se crea
+    y las banderas por bloque siguen siendo la señal disponible."""
+    ruta = config.OUTPUTS_DIR / "eda" / "faltantes_solapamiento.json"
+    if not ruta.exists():
+        return None
+    with open(ruta, encoding="utf-8") as f:
+        return json.load(f).get("lift_estimador_vivienda")
+
+
+def agregar_perfil_incompleto(df, lift_medido=None):
+    """SPEC_V2 §5: bandera única, SOLO si §6.5.2 confirma causa común (D7: lift
+    condicional >= config.UMBRAL_LIFT_PERFIL_INCOMPLETO)."""
+    if lift_medido is None:
+        lift_medido = _lift_medido_desde_eda()
+    if lift_medido is None:
+        return df
+    if not decidir_perfil_incompleto(lift_medido)["crear_bandera_unica"]:
+        return df
+
+    out = df.copy()
+    presentes = [c for c in BLOQUES_PERFIL if c in out.columns]
+    out["perfil_incompleto"] = (out[presentes].sum(axis=1) > 0).astype(int)
     return out
 
 
@@ -207,6 +238,13 @@ def construir_cliente_features():
     ).astype("Int64")
     base = base.merge(
         primer[["numero_id", "antiguedad_relacion_meses"]], on="numero_id", how="left")
+
+    # SPEC_V2 §5/§6.5.2 (D7): bandera única `perfil_incompleto`, solo si el
+    # lift condicional medido por notebooks/03_eda_faltantes.ipynb supera el
+    # umbral. No-op (columna ausente) si el notebook no se ha corrido o si el
+    # lift medido no confirma causa común -- las banderas por bloque siguen
+    # siendo la señal disponible en ese caso.
+    base = agregar_perfil_incompleto(base)
 
     escribir_tabla_sqlite(base, config.ORO_DB, "cliente_features")
     return base

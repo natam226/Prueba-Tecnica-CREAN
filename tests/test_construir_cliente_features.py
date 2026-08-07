@@ -380,3 +380,22 @@ def test_cliente_features_incluye_las_derivadas_de_spec_v2(tmp_path, monkeypatch
     assert r.loc[501, "antiguedad_relacion_meses"] == 2   # ene -> mar (FECHA_CORTE, D8)
     assert r.loc[501, "cuenta_ahorro_tendencia_relativa_6m"] == (
         r.loc[501, "cuenta_ahorro_tendencia_6m"] / r.loc[501, "cuenta_ahorro_saldo_prom_6m"])
+
+
+def test_perfil_incompleto_solo_si_hay_solapamiento_alto(tmp_path, monkeypatch):
+    """SPEC_V2 §5: `perfil_incompleto` es una bandera única que reemplaza a las
+    banderas por bloque, y solo se crea si el lift condicional (D7) lo justifica."""
+    from oro.construir_cliente_features import agregar_perfil_incompleto
+
+    df = pd.DataFrame({
+        "numero_id": [1, 2, 3],
+        "falta_estimador": [1, 1, 0],
+        "falta_vivienda": [1, 0, 0],
+    })
+
+    alto = agregar_perfil_incompleto(df, lift_medido=2.4)
+    assert "perfil_incompleto" in alto.columns
+    assert alto["perfil_incompleto"].tolist() == [1, 1, 0]   # falta algún bloque
+
+    bajo = agregar_perfil_incompleto(df, lift_medido=1.05)
+    assert "perfil_incompleto" not in bajo.columns
