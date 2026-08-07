@@ -20,6 +20,7 @@ import streamlit as st
 import config
 from app import datos as dat
 from app import estilo as es
+from app import explicacion as exp
 
 st.set_page_config(page_title="CREAN · App de inversiones",
                    page_icon="📊", layout="wide")
@@ -526,11 +527,36 @@ def vista_priorizacion():
             "adquisición en frío; no para prometer una tasa de conversión."
         )
 
-    COLS = ["numero_id", "poblacion", "nivel", "desc_segmento", "grupo_edad",
-            "score", "modelo_usado", "monto_base_12m", "valor_esperado_12m",
-            "valor_referencia", "tipo_valor_referencia"]
+    # `valor_referencia` tiene TRES definiciones según la población: score x
+    # monto estimado, score x capacidad de ahorro (un proxy), o el score solo
+    # cuando no hay ni proxy. Sus escalas no son comparables, así que ordenar
+    # una lista mezclada por ese campo deja arriba a clientes de score bajísimo
+    # empujados por una capacidad de ahorro implausible. Se ordena por el
+    # percentil DENTRO de cada población -- la misma lógica con la que se
+    # construyen los niveles (src/niveles.py), y por eso el mismo `method`.
+    sel = sel.assign(
+        percentil_en_poblacion=sel.groupby("poblacion")["valor_referencia"]
+        .rank(method="first", pct=True))
+
+    COLS = ["numero_id", "poblacion", "nivel", "percentil_en_poblacion",
+            "desc_segmento", "grupo_edad", "score", "modelo_usado",
+            "monto_base_12m", "valor_esperado_12m", "valor_referencia",
+            "tipo_valor_referencia"]
     lista = (sel[[c for c in COLS if c in sel.columns]]
-             .sort_values("valor_referencia", ascending=False))
+             .sort_values("percentil_en_poblacion", ascending=False))
+
+    if sel["poblacion"].nunique() > 1:
+        es.cautela(
+            "La selección mezcla poblaciones que se rankean con escalas "
+            "distintas, así que la lista se ordena por <b>percentil dentro de "
+            "cada población</b> y no por <code>valor_referencia</code>. "
+            "Ordenar por el valor crudo pondría arriba a clientes con score "
+            "muy bajo arrastrados por una capacidad de ahorro poco creíble: en "
+            "la base hay <b>222 clientes con más de 1.000 millones COP anuales "
+            "de capacidad</b> y el máximo llega a 108 billones, contra una "
+            "mediana de 18 millones. Es un problema de calidad en la fuente, "
+            "no del modelo, y conviene acotarlo antes de operar la lista."
+        )
 
     tope = st.number_input(
         "Cuántos exportar (los de mayor valor de referencia)",
@@ -574,6 +600,129 @@ def vista_priorizacion():
         "⬇  Descargar lista de contacto (CSV)",
         lista.to_csv(index=False).encode("utf-8-sig"),
         file_name="lista_contacto_crean.csv", mime="text/csv", type="primary")
+
+    st.header("Ficha de cliente")
+
+    # La ficha es secundaria: la lista de contacto de arriba es el entregable.
+    # Si falta su insumo se avisa aquí y se corta, en vez de dejar que el
+    # guardián de la vista se lleve por delante también la lista.
+    try:
+        woe_bins = dat.csv("eda/woe_por_bin.csv")
+    except dat.ArtefactosFaltantes as falta:
+        st.info(
+            f"La ficha individual necesita `{falta}`, que produce "
+            "`notebooks/04_validacion_variables.ipynb`. La lista de contacto "
+            "de arriba no depende de ese archivo y sigue disponible.")
+        st.stop()
+
+    st.caption(
+        "La pregunta que sigue a una lista priorizada siempre es la misma: "
+        "«¿y este por qué?». Aquí está la respuesta para un cliente concreto.")
+
+    if "cliente_ficha" not in st.session_state:
+        st.session_state["cliente_ficha"] = str(lista.iloc[0]["numero_id"])
+    sug = lista.head(20)["numero_id"].tolist()
+    c_sel, c_txt = st.columns([2, 3])
+    elegido = c_sel.selectbox("Elegir de los 20 primeros", sug,
+                              index=sug.index(st.session_state["cliente_ficha"])
+                              if st.session_state["cliente_ficha"] in sug else 0)
+    escrito = c_txt.text_input("…o pegar un ID de cliente", value=elegido)
+    cliente_id = (escrito or elegido).strip()
+    st.session_state["cliente_ficha"] = cliente_id
+
+    features = dat.features_de(cliente_id)
+    if features is None:
+        st.warning(f"No existe ningún cliente con el identificador `{cliente_id}`.")
+        st.stop()
+
+    fila = base[base["numero_id"] == cliente_id]
+    if fila.empty:
+        st.warning("El cliente existe pero no está en la tabla de scoring.")
+        st.stop()
+    fila = fila.iloc[0]
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Score", f"{fila['score']:.4f}",
+              f"nivel {fila['nivel']} · modelo {fila['modelo_usado']}")
+    k2.metric("Población", str(fila["poblacion"]).replace("_", " "))
+    k3.metric("Monto estimado 12m", es.cop(fila.get("monto_base_12m")))
+    k4.metric("Segmento", str(fila.get("desc_segmento", "—")))
+
+    if fila["poblacion"] == "sin_historial":
+        es.cautela(
+            "Este cliente <b>no tiene productos</b>. Su score es de similitud, "
+            "no una probabilidad validada, y no tiene monto estimable.")
+
+    evidencia = exp.evidencia_del_cliente(features, woe_bins)
+    if evidencia.empty:
+        st.info("No se pudo ubicar ninguna variable de este cliente en los "
+                "tramos de WoE calculados.")
+        st.stop()
+
+    es.cautela(
+        "<b>Esto no es la atribución del modelo.</b> El WoE mide la asociación "
+        "<b>univariada</b> de cada variable con la adopción, medida sobre toda "
+        "la base. El modelo de propensión es un ensamble de árboles que captura "
+        "interacciones que esta descomposición no ve. La lectura correcta es "
+        "«qué tiene este cliente que se asocia con adoptar», no «por esto el "
+        "modelo dio ese score». Para atribución fiel al modelo haría falta SHAP."
+    )
+
+    top = evidencia.head(12)
+    izq, der = st.columns([3, 2])
+    with izq:
+        st.altair_chart(
+            alt.Chart(top).mark_bar(cornerRadiusEnd=3).encode(
+                y=alt.Y("variable:N", sort="-x", title=None),
+                # Se grafica -woe para que la barra hacia la derecha signifique
+                # "a favor": con el signo crudo el gráfico se lee al revés.
+                x=alt.X("a_favor:Q", title="← en contra    ·    a favor →"),
+                color=alt.Color("direccion:N", title=None,
+                                scale=alt.Scale(
+                                    domain=["a favor", "en contra", "neutro"],
+                                    range=[es.VERDE, es.TERRACOTA, es.GRIS])),
+                tooltip=["variable:N", "bin:N", "direccion:N",
+                         alt.Tooltip("woe:Q", format=".3f", title="WoE")],
+            ).transform_calculate(a_favor="-datum.woe")
+            .properties(width="container", height=330))
+    with der:
+        st.dataframe(
+            top[["variable", "valor_cliente", "bin", "direccion"]],
+            hide_index=True, width="stretch", height=330,
+            column_config={
+                "variable": st.column_config.TextColumn("Variable"),
+                "valor_cliente": st.column_config.TextColumn("Valor"),
+                "bin": st.column_config.TextColumn("Tramo"),
+                "direccion": st.column_config.TextColumn("Evidencia"),
+            })
+
+    st.subheader("Contra quién se compara")
+    numericas = tuple(v for v in top["variable"]
+                      if pd.api.types.is_number(features[v]))
+    if numericas:
+        medianas = dat.medianas_por_etiqueta(numericas)
+        comparacion = (medianas.assign(
+            valor_cliente=lambda d: d["variable"].map(lambda v: features[v]))
+            [["variable", "valor_cliente",
+              "mediana_adoptantes", "mediana_no_adoptantes"]])
+        st.dataframe(
+            comparacion, hide_index=True, width="stretch",
+            column_config={
+                "variable": st.column_config.TextColumn("Variable"),
+                "valor_cliente": st.column_config.NumberColumn(
+                    "Este cliente", format="%.2f"),
+                "mediana_adoptantes": st.column_config.NumberColumn(
+                    "Mediana de quien adopta", format="%.2f"),
+                "mediana_no_adoptantes": st.column_config.NumberColumn(
+                    "Mediana de quien no", format="%.2f"),
+            })
+        es.pie(
+            "Las medianas se calculan sobre los 860.223 clientes usando la "
+            "etiqueta de adopción observada. Es contexto descriptivo, no "
+            "predicción.")
+    else:
+        st.info("Ninguna de las variables más determinantes de este cliente es "
+                "numérica, así que no hay mediana con la cual contrastar.")
 
 
 # ===========================================================================

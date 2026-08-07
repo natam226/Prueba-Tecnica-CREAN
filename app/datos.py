@@ -5,6 +5,7 @@ el notebook manda. Deliberadamente no se carga `fact_saldos_mensual`
 (9.9 M filas): la serie mensual se agrega en el pipeline, no aquí.
 """
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -53,6 +54,56 @@ def base_clientes() -> pd.DataFrame:
     datos = score.merge(dim[cols], on="numero_id", how="left")
     datos["numero_id"] = datos["numero_id"].astype("int64").astype(str)
     return datos
+
+
+@st.cache_data
+def features_de(numero_id: str) -> pd.Series | None:
+    """Fila de `cliente_features` de un cliente, para la ficha individual.
+
+    Es la única lectura del tablero que va a `oro.db` en vez de a `outputs/`:
+    los valores crudos por cliente no están en ningún entregable, y exportar
+    860.223 filas por 90 columnas para consultar una sola sería peor.
+
+    `numero_id` entra y se compara como TEXTO porque llega a ±9.2e18 y
+    convertirlo a número le cambiaría los últimos dígitos.
+    """
+    if not config.ORO_DB.exists():
+        raise ArtefactosFaltantes("oro/data/oro.db")
+    con = sqlite3.connect(config.ORO_DB)
+    try:
+        fila = pd.read_sql(
+            "SELECT * FROM cliente_features WHERE CAST(numero_id AS TEXT) = ?",
+            con, params=(str(numero_id),))
+    finally:
+        con.close()
+    if fila.empty:
+        return None
+    return fila.iloc[0]
+
+
+@st.cache_data
+def medianas_por_etiqueta(variables: tuple[str, ...]) -> pd.DataFrame:
+    """Mediana de cada variable entre adoptantes y no adoptantes.
+
+    Es el contraste que convierte un valor suelto en información: saber que un
+    cliente tiene $24 M de patrimonio no dice nada hasta verlo al lado de la
+    mediana de quien adopta.
+    """
+    if not config.ORO_DB.exists():
+        raise ArtefactosFaltantes("oro/data/oro.db")
+    seleccion = ", ".join(f'"{v}"' for v in variables)
+    con = sqlite3.connect(config.ORO_DB)
+    try:
+        datos = pd.read_sql(
+            f"SELECT etiqueta_adopcion, {seleccion} FROM cliente_features", con)
+    finally:
+        con.close()
+    numericas = [v for v in variables
+                 if pd.api.types.is_numeric_dtype(datos[v])]
+    medianas = datos.groupby("etiqueta_adopcion")[numericas].median().T
+    medianas.columns = [f"mediana_{'adoptantes' if c == 1 else 'no_adoptantes'}"
+                        for c in medianas.columns]
+    return medianas.reset_index(names="variable")
 
 
 # Qué hay que ejecutar para producir cada artefacto. Sin este mapa el aviso
