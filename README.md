@@ -5,6 +5,15 @@ con EDA, modelado, auditoría de sesgo y dimensionamiento de oportunidad en
 Jupyter, una interfaz de resultados en Streamlit y export final para Power BI.
 Implementa `SPEC_V2.md` con las decisiones de `DECISIONES.md`.
 
+## Documentos
+
+| Documento | Contenido |
+|---|---|
+| [`docs/modelo_conceptual.md`](docs/modelo_conceptual.md) | Modelo conceptual, diagrama de procesos con actores y puntos de decisión, y aporte a los procesos de CREAN |
+| [`docs/esquema_operacion.md`](docs/esquema_operacion.md) | Cómo se generan, actualizan y consumen los resultados; seguimiento, mantenimiento y evolución |
+| `DECISIONES.md` | Razonamiento narrativo detrás de cada decisión analítica |
+| `SPEC_V2.md` | Especificación que implementa el pipeline |
+
 ## Setup
 
 Instalar dependencias en el venv del proyecto:
