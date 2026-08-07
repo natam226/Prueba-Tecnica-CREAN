@@ -37,6 +37,14 @@ def test_falla_con_agregados_que_suman_productos_de_la_etiqueta():
             validar_sin_fuga(["ingresos_mensuales", col])
 
 
+def test_falla_con_etiqueta_alternativa_de_sensibilidad():
+    # D0.2/N4: etiqueta_adopcion_reciente es otra etiqueta (ventana alternativa),
+    # no una predictora. El guard debe atraparla directamente, sin depender del
+    # pre-filtro de features_modelo.COLUMNAS_NO_FEATURE.
+    with pytest.raises(FugaDeInformacionError):
+        validar_sin_fuga(["ingresos_mensuales", "etiqueta_adopcion_reciente"])
+
+
 def test_acepta_las_derivadas_no_etiqueta():
     # Estas SÍ son predictoras legítimas: solo suman CDT y Fiducuenta
     assert validar_sin_fuga([

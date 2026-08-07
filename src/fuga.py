@@ -25,6 +25,7 @@ COLUMNAS_FUGA_EXPLICITAS = frozenset({
     "n_productos_total",          # cuenta TODOS los productos, incluidos los de la etiqueta
     "tiene_historial_inversion",  # §6.3: incluye historial en Invesbot/IV
     "monto_estimado_12m",         # salida del modelo de monto, no entrada
+    "etiqueta_adopcion_reciente", # D0.2/N4: variante de la etiqueta con ventana alternativa
 })
 
 
