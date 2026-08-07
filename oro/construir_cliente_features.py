@@ -2,7 +2,7 @@
 import config
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
 
-PRODUCTOS = ["cuenta_ahorro", "cuenta_corriente", "bolsillos", "fiducuenta", "cdt", "inversion_virtual", "invesbot"]
+PRODUCTOS = config.PRODUCTOS
 
 TABLAS_PRODUCTO = {
     "cuenta_ahorro": "aho_cte_plata",
@@ -65,6 +65,17 @@ def construir_cliente_features():
     base["etiqueta_adopcion"] = (
         (base["invesbot_saldo_snapshot"] > 0) | (base["inversion_virtual_saldo_snapshot"] > 0)
     ).astype(int)
+
+    # --- SPEC_V2 §1.1: agregados de inversión que NO tocan la etiqueta ---
+    # Solo CDT y Fiducuenta. Nunca Invesbot ni Inversión Virtual: sumarlos
+    # reintroduciría la etiqueta dentro de las predictoras.
+    cols_saldo_no_etiqueta = [
+        f"{p}_saldo_snapshot" for p in config.PRODUCTOS_INVERSION_NO_ETIQUETA
+    ]
+    base["saldo_invertido_no_etiqueta"] = base[cols_saldo_no_etiqueta].fillna(0.0).sum(axis=1)
+    base["n_productos_inversion_no_etiqueta"] = (
+        (base[cols_saldo_no_etiqueta].fillna(0.0) > 0).sum(axis=1).astype(int)
+    )
 
     tenencia_cols = [f"{p}_tenencia" for p in PRODUCTOS]
     base["excluir_modelado"] = (
