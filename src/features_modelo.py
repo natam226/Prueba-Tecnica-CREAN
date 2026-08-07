@@ -10,13 +10,15 @@ guard viven juntos para que sea imposible entrenar saltándose la comprobación.
 from typing import Iterable
 
 import config
-from src.fuga import PREFIJOS_FUGA, validar_sin_fuga
+from src.fuga import COLUMNAS_FUGA_EXPLICITAS, PREFIJOS_FUGA, validar_sin_fuga
 
 # Identificadores, etiquetas y banderas de población: nunca son predictoras.
+# NOTA: las columnas de fuga (invesbot/inv_virtual y sus agregados explícitos,
+# p.ej. n_productos_total, etiqueta_adopcion_reciente) NO se listan aquí. Se
+# excluyen más abajo referenciando directamente `fuga.COLUMNAS_FUGA_EXPLICITAS`
+# y `fuga.PREFIJOS_FUGA` -- ver el comentario sobre esa decisión junto al filtro.
 COLUMNAS_NO_FEATURE = frozenset({
     "numero_id",
-    "etiqueta_adopcion",
-    "etiqueta_adopcion_reciente",  # D0.2/N4: etiqueta alternativa de sensibilidad, no predictora
     "apto_entrenamiento",
     "tiene_historial_producto",
     "sin_ninguna_senal",
@@ -67,11 +69,25 @@ COLUMNAS_MODELO_B = tuple(config.COLS_FINANCIERAS) + (
 
 
 def features_modelo_a(columnas: Iterable[str]) -> list[str]:
-    """Predictoras del Modelo A: todo menos ids, etiquetas, fuga y género."""
+    """Predictoras del Modelo A: todo menos ids, etiquetas, fuga y género.
+
+    La exclusión de fuga se hace referenciando `fuga.COLUMNAS_FUGA_EXPLICITAS`
+    y `fuga.PREFIJOS_FUGA` directamente en vez de mantener una copia propia:
+    tres bugs seguidos (etiqueta_adopcion_reciente, n_productos_total) fueron
+    causados por una tarea posterior agregando una columna real que ya estaba
+    en la lista de fuga.py pero que esta lista nunca se enteró de duplicar.
+    Referenciar el mismo objeto elimina esa clase de bug de raíz: una sola
+    fuente de verdad para "qué es fuga". `validar_sin_fuga` sigue corriendo
+    después como backstop -- no depende de que este filtro esté completo, así
+    que sigue pudiendo fallar si algo más (un descuido en COLUMNAS_NO_FEATURE,
+    COLUMNAS_SENSIBLES_EXCLUIDAS o SUFIJOS_EXCLUIDOS_A) deja pasar una columna
+    de fuga por otra vía.
+    """
     feats = [
         c for c in columnas
         if c not in COLUMNAS_NO_FEATURE
         and c not in COLUMNAS_SENSIBLES_EXCLUIDAS
+        and c not in COLUMNAS_FUGA_EXPLICITAS
         and not c.startswith(PREFIJOS_EXCLUIDOS_A)
         and not c.endswith(SUFIJOS_EXCLUIDOS_A)
     ]

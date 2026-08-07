@@ -1,6 +1,6 @@
 import pytest
 
-from src.fuga import FugaDeInformacionError
+from src.fuga import COLUMNAS_FUGA_EXPLICITAS, FugaDeInformacionError
 from src.features_modelo import (
     COLUMNAS_SENSIBLES_EXCLUIDAS,
     features_modelo_a,
@@ -93,6 +93,22 @@ def test_modelo_a_excluye_fecha_snapshot_por_producto():
     assert "dias_desde_ultimo_dato" in feats
 
 
+def test_modelo_a_excluye_toda_columna_de_fuga_explicita_sin_lanzar():
+    # Regresión: Task 9 agregó n_productos_total a cliente_features. Esa
+    # columna ya estaba en fuga.COLUMNAS_FUGA_EXPLICITAS (agrega TODOS los
+    # productos, incluidos los de la etiqueta), pero features_modelo nunca la
+    # excluía por su cuenta, así que sobrevivía al selector y hacía explotar
+    # validar_sin_fuga en lugar de simplemente quedar fuera. La prueba es
+    # data-driven sobre fuga.COLUMNAS_FUGA_EXPLICITAS para que una futura
+    # adición a ese set quede cubierta automáticamente, sin tener que acordarse
+    # de escribir un test nuevo cada vez (que es justo el patrón que falló acá
+    # y con etiqueta_adopcion_reciente antes).
+    columnas = COLUMNAS_TIPICAS + sorted(COLUMNAS_FUGA_EXPLICITAS)
+    feats = features_modelo_a(columnas)  # no debe lanzar FugaDeInformacionError
+    for c in COLUMNAS_FUGA_EXPLICITAS:
+        assert c not in feats, f"{c} es fuga explícita y debe quedar excluida, no causar un error"
+
+
 def test_ambas_funciones_lanzan_si_se_cuela_una_columna_prohibida(monkeypatch):
     import src.features_modelo as fm
     # simula un descuido: alguien saca invesbot_ de la lista de no-features
@@ -100,3 +116,16 @@ def test_ambas_funciones_lanzan_si_se_cuela_una_columna_prohibida(monkeypatch):
     monkeypatch.setattr(fm, "PREFIJOS_EXCLUIDOS_A", ())
     with pytest.raises(FugaDeInformacionError):
         fm.features_modelo_a(["invesbot_saldo_snapshot", "ingresos_mensuales"])
+
+
+def test_guard_atrapa_fuga_explicita_aunque_el_filtro_sistematico_falle(monkeypatch):
+    # El filtro sistemático (features_modelo_a excluyendo COLUMNAS_FUGA_EXPLICITAS
+    # directamente) no debe volver inalcanzable al guard: validar_sin_fuga hace su
+    # propia comprobación independiente contra la fuga.COLUMNAS_FUGA_EXPLICITAS
+    # real, así que sigue pudiendo fallar aunque la copia local del módulo se
+    # vea comprometida (p.ej. por un monkeypatch, o un bug futuro).
+    import src.features_modelo as fm
+    monkeypatch.setattr(fm, "COLUMNAS_NO_FEATURE", frozenset())
+    monkeypatch.setattr(fm, "COLUMNAS_FUGA_EXPLICITAS", frozenset())
+    with pytest.raises(FugaDeInformacionError):
+        fm.features_modelo_a(["n_productos_total", "ingresos_mensuales"])
