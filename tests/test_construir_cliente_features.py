@@ -34,6 +34,9 @@ def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
     oro_db = tmp_path / "oro.db"
     monkeypatch.setattr(config, "PLATA_DB", plata_db)
     monkeypatch.setattr(config, "ORO_DB", oro_db)
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-06-01"))
 
     clientes_plata = pd.DataFrame({"numero_id": [201, 202, 203, 204]})
     escribir_tabla_sqlite(clientes_plata, plata_db, "clientes_plata")
@@ -98,6 +101,9 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
     oro_db = tmp_path / "oro.db"
     monkeypatch.setattr(config, "PLATA_DB", plata_db)
     monkeypatch.setattr(config, "ORO_DB", oro_db)
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-06-01"))
 
     escribir_tabla_sqlite(pd.DataFrame({"numero_id": [301, 302]}), plata_db, "clientes_plata")
 
