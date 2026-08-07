@@ -184,12 +184,34 @@ reporta su conteo de filas):
   `eda/` (resúmenes y CSV de la EDA), `models/` (modelos entrenados, métricas,
   curva precisión/recall), `decisiones/` (log de decisiones, ver abajo),
   `powerbi/` (los 8 CSV finales para Power BI).
-- **app** (`app/tablero.py`): interfaz de resultados en Streamlit, en cuatro
-  vistas — dimensionamiento con simulador de captura, lista de contacto
-  priorizada y descargable, sustento estadístico del modelo, y auditoría de
-  sesgo con los supuestos. Solo lee `outputs/`; si una cifra no cuadra con un
+- **app** (`app/`): tablero de resultados en Streamlit, separado en tres
+  archivos — `tablero.py` (las vistas), `estilo.py` (paleta, CSS y formateo de
+  cifras) y `datos.py` (carga cacheada). El tema vive en
+  `.streamlit/config.toml`. Solo lee `outputs/`; si una cifra no cuadra con un
   notebook, el notebook manda. No carga `fact_saldos_mensual` (9.9 M filas): la
   serie mensual se agrega en el pipeline, no en la capa de presentación.
+
+  Seis vistas, en el orden en que se cuenta la historia, cada una declarando la
+  pregunta que responde:
+
+  | Vista | Responde | Requerimiento del brief |
+  |---|---|---|
+  | Resumen | Qué se construyó y qué respondió | — |
+  | Caracterización | Quiénes son y quiénes adoptan | 2 · analizar y caracterizar |
+  | Modelos | Cómo se predice y qué tan bien | 3 · uno o más modelos |
+  | Oportunidad | Cuánto vale y bajo qué supuesto | 4 · dimensionar la oportunidad |
+  | Priorización | A quién contactar | 7 · recomendaciones accionables |
+  | Sesgo y supuestos | Qué no sabemos y qué puede salir mal | — |
+
+  La vista de Modelos incluye la **curva de esfuerzo de contacto**: contactando
+  al 10% mejor rankeado se alcanza al 51.7% de los adoptantes con 37.0% de
+  precisión, 5.2× la tasa base. Es la tabla que convierte el AUC en una
+  decisión operativa.
+
+  `numero_id` se carga como **texto** en el tablero y la exportación sale en
+  UTF-8 con BOM: el identificador es un entero de 19 dígitos (hasta ±9.2e18) y
+  cualquier herramienta que lo infiera como decimal le cambia los últimos
+  dígitos en silencio.
 
 ## Qué se versiona de `outputs/`
 

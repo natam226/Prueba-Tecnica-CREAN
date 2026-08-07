@@ -1,0 +1,15 @@
+# Tema del tablero. La paleta coincide con app/estilo.py: si se cambia el
+# acento aquí, cambiarlo también allá.
+[theme]
+base = "light"
+primaryColor = "#1F6F8B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F8"
+textColor = "#1F2933"
+
+[server]
+# El tablero es de lectura: no necesita subir archivos.
+maxUploadSize = 1
+
+[browser]
+gatherUsageStats = false
