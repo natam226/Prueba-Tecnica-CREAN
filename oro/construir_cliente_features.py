@@ -1,6 +1,9 @@
 # oro/construir_cliente_features.py
+import pandas as pd
+
 import config
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
+from src.fecha_corte import calcular_fecha_corte
 
 PRODUCTOS = config.PRODUCTOS
 
@@ -18,15 +21,52 @@ TABLAS_PRODUCTO = {
 def _pivotear_producto(clientes_ids, producto):
     tabla = TABLAS_PRODUCTO[producto]
     df = leer_tabla_sqlite(config.PLATA_DB, tabla)
-    df = df[df["producto"] == producto].drop(columns=["producto", "fecha_snapshot"])
+    df["fecha_snapshot"] = pd.to_datetime(df["fecha_snapshot"])
+    df = df[df["producto"] == producto].drop(columns=["producto"])
     df = df.rename(columns={
         "saldo_snapshot": f"{producto}_saldo_snapshot",
         "saldo_prom_6m": f"{producto}_saldo_prom_6m",
         "tendencia_6m": f"{producto}_tendencia_6m",
         "tenencia": f"{producto}_tenencia",
         "n_obs_ventana": f"{producto}_n_obs_ventana",
+        "fecha_snapshot": f"{producto}_fecha_snapshot",   # D0: ya no se descarta
     })
     return df
+
+
+def agregar_recencia_dato(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.DataFrame:
+    """D0, requisito 1: control de calidad de dato por cliente (N1).
+
+    `dias_desde_ultimo_dato` = FECHA_CORTE - máxima fecha_snapshot entre las 5
+    fuentes de saldo. Un cliente sin NINGUNA fila de producto queda en NULO +
+    bandera `sin_dato_reciente`, nunca en 0 ni en un valor grande arbitrario.
+    """
+    out = base.copy()
+    fecha_cols = [f"{p}_fecha_snapshot" for p in PRODUCTOS]
+    presentes = [c for c in fecha_cols if c in out.columns]
+    ultimo_dato = out[presentes].max(axis=1)
+    out["dias_desde_ultimo_dato"] = (fecha_corte - ultimo_dato).dt.days.astype("Int64")
+    out["sin_dato_reciente"] = ultimo_dato.isna().astype(int)
+    return out
+
+
+def agregar_etiqueta_adopcion_reciente(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.DataFrame:
+    """D0, análisis de sensibilidad: etiqueta alternativa que SÍ exige recencia
+    (N4: ventana de `config.VENTANA_DIAS_ETIQUETA_RECIENTE` días desde
+    FECHA_CORTE). Solo se usa para comparar contra la etiqueta principal en la
+    Task 18B - la etiqueta principal (`etiqueta_adopcion`) no cambia."""
+    out = base.copy()
+    ventana = config.VENTANA_DIAS_ETIQUETA_RECIENTE
+    reciente_invesbot = (
+        (out["invesbot_saldo_snapshot"] > 0)
+        & ((fecha_corte - out["invesbot_fecha_snapshot"]).dt.days <= ventana)
+    ).fillna(False)
+    reciente_iv = (
+        (out["inversion_virtual_saldo_snapshot"] > 0)
+        & ((fecha_corte - out["inversion_virtual_fecha_snapshot"]).dt.days <= ventana)
+    ).fillna(False)
+    out["etiqueta_adopcion_reciente"] = (reciente_invesbot | reciente_iv).astype(int)
+    return out
 
 
 def construir_cliente_features():
@@ -65,6 +105,10 @@ def construir_cliente_features():
     base["etiqueta_adopcion"] = (
         (base["invesbot_saldo_snapshot"] > 0) | (base["inversion_virtual_saldo_snapshot"] > 0)
     ).astype(int)
+
+    fecha_corte = calcular_fecha_corte()
+    base = agregar_recencia_dato(base, fecha_corte)
+    base = agregar_etiqueta_adopcion_reciente(base, fecha_corte)
 
     # --- SPEC_V2 §1.1: agregados de inversión que NO tocan la etiqueta ---
     # Solo CDT y Fiducuenta. Nunca Invesbot ni Inversión Virtual: sumarlos

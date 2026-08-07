@@ -6,13 +6,13 @@ from oro.construir_cliente_features import construir_cliente_features
 
 
 def _tabla_producto(numero_id, producto, saldo_snapshot=100.0, saldo_prom_6m=100.0,
-                     tendencia_6m=0.0, n_obs_ventana=1, tenencia=1):
+                     tendencia_6m=0.0, n_obs_ventana=1, tenencia=1, fecha_snapshot="2026-06-01"):
     """Fila mínima con el esquema que produce agregar_serie_saldo (post Fix 1)."""
     return {
         "numero_id": numero_id,
         "producto": producto,
         "saldo_snapshot": saldo_snapshot,
-        "fecha_snapshot": "2026-06-01",
+        "fecha_snapshot": fecha_snapshot,
         "saldo_prom_6m": saldo_prom_6m,
         "tendencia_6m": tendencia_6m,
         "n_obs_ventana": n_obs_ventana,
@@ -132,3 +132,49 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
     assert r.loc[301, "saldo_invertido_no_etiqueta"] == 0.0
     assert r.loc[302, "n_productos_inversion_no_etiqueta"] == 2
     assert r.loc[302, "saldo_invertido_no_etiqueta"] == 1000.0
+
+
+def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
+    """D0: dias_desde_ultimo_dato es el máximo de fecha_snapshot entre las 5
+    fuentes de saldo (N1); etiqueta_adopcion_reciente exige que el snapshot de
+    Invesbot/Inversión Virtual esté dentro de la ventana de recencia (N4)."""
+    plata_db = tmp_path / "plata.db"
+    oro_db = tmp_path / "oro.db"
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+    monkeypatch.setattr(config, "ORO_DB", oro_db)
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-06-01"))
+
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [601, 602, 603]}), plata_db, "clientes_plata")
+
+    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
+                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    for t in ["aho_cte_plata", "bolsillos_plata", "fiducuenta_plata", "cdt_inversion_virtual_plata"]:
+        escribir_tabla_sqlite(vacia, plata_db, t)
+
+    # 601: saldo positivo en invesbot, snapshot RECIENTE (dentro de 90 días del corte)
+    # 602: saldo positivo en invesbot, snapshot ANTIGUO (fuera de la ventana)
+    # 603: sin ninguna fila de producto -> sin dato en absoluto
+    escribir_tabla_sqlite(pd.DataFrame([
+        _tabla_producto(601, "invesbot", saldo_snapshot=500.0, fecha_snapshot="2026-05-15"),
+        _tabla_producto(602, "invesbot", saldo_snapshot=500.0, fecha_snapshot="2025-01-01"),
+    ]), plata_db, "invesbot_plata")
+
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
+        plata_db, "estimador_ingresos_plata")
+
+    r = construir_cliente_features().set_index("numero_id")
+
+    assert r.loc[601, "etiqueta_adopcion"] == 1        # etiqueta principal: sin exigir recencia
+    assert r.loc[602, "etiqueta_adopcion"] == 1        # también positivo, aunque el dato sea viejo
+    assert r.loc[601, "etiqueta_adopcion_reciente"] == 1
+    assert r.loc[602, "etiqueta_adopcion_reciente"] == 0   # fuera de la ventana de 90 días
+    assert r.loc[603, "etiqueta_adopcion_reciente"] == 0
+
+    assert r.loc[601, "dias_desde_ultimo_dato"] == 17
+    assert pd.isna(r.loc[603, "dias_desde_ultimo_dato"])
+    assert r.loc[603, "sin_dato_reciente"] == 1
+    assert r.loc[601, "sin_dato_reciente"] == 0
