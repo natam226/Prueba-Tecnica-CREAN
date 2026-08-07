@@ -39,6 +39,16 @@ def construir_panel_mensual(df, group_cols, fecha_col="fecha", saldo_col="saldo"
     Para cada grupo: se toma el ÚLTIMO saldo observado dentro de cada mes, se
     completa la rejilla desde el primer mes del grupo hasta `mes_max` (por
     defecto, el mes máximo observado en `df`), y se rellena hacia adelante.
+
+    Contrato en el límite de `mes_max`: si el primer mes real de un grupo es
+    POSTERIOR a `mes_max`, ese grupo no tiene ningún mes válido dentro de la
+    ventana solicitada y se omite del panel por completo (cero filas, sin
+    warning ni error) — igual que `agregar_serie_saldo` ya descarta filas
+    posteriores al corte. Si el primer mes real coincide exactamente con
+    `mes_max`, el grupo sí produce una fila (la de ese único mes). Esta
+    función es un helper genérico y no reporta cuántos grupos caen fuera de
+    la ventana; ese conteo (por fuente, D4) es responsabilidad del código
+    que la llama (Task 7), que conoce la procedencia de cada fila.
     """
     group_cols = list(group_cols)
     d = df[group_cols + [fecha_col, saldo_col]].copy()

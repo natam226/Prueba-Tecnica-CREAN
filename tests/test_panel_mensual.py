@@ -84,6 +84,42 @@ def test_primer_mes_por_grupo():
     assert r.loc[2, "primer_mes"] == pd.Timestamp("2026-02-01")
 
 
+def test_mes_max_anterior_al_primer_mes_del_grupo_omite_el_grupo_sin_filtrar_otros():
+    """Contrato del límite de mes_max: si el primer dato real de un grupo cae
+    DESPUES de mes_max, ese grupo no tiene ningún mes dentro de la ventana y
+    se omite por completo (0 filas), sin afectar a otros grupos que sí caen
+    dentro de la ventana."""
+    df = pd.DataFrame({
+        "numero_id": [1, 2],
+        "producto": ["cdt", "cdt"],
+        "fecha": ["2026-01-15", "2026-05-01"],
+        "saldo": [100.0, 999.0],
+    })
+    panel = construir_panel_mensual(
+        df, group_cols=["numero_id", "producto"], mes_max=pd.Timestamp("2026-03-01")
+    )
+    assert (panel["numero_id"] == 2).sum() == 0
+    c1 = panel[panel["numero_id"] == 1].sort_values("mes")["saldo_mes"].tolist()
+    assert c1 == [100.0, 100.0, 100.0]
+
+
+def test_mes_max_igual_al_primer_mes_del_grupo_produce_una_fila():
+    """Caso límite vecino del anterior: si el primer dato real cae EXACTAMENTE
+    en mes_max, el grupo produce una única fila (no cero)."""
+    df = pd.DataFrame({
+        "numero_id": [1],
+        "producto": ["cdt"],
+        "fecha": ["2026-03-15"],
+        "saldo": [100.0],
+    })
+    panel = construir_panel_mensual(
+        df, group_cols=["numero_id", "producto"], mes_max=pd.Timestamp("2026-03-01")
+    )
+    assert len(panel) == 1
+    assert panel["mes"].tolist() == [pd.Timestamp("2026-03-01")]
+    assert panel["saldo_mes"].tolist() == [100.0]
+
+
 def test_observado_distingue_mes_real_de_mes_arrastrado():
     """D9 (N5): `observado` marca los meses con fila real en `df`. Entre enero
     (real) y abril (real) los meses de por medio (feb, mar) son forward fill:
