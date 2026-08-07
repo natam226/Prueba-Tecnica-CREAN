@@ -1,0 +1,14 @@
+{
+  "n_total": 860223,
+  "n_sin_estimador": 114431,
+  "n_nulos_financieros_any": 260,
+  "n_nulos_financieros_all": 249,
+  "n_interseccion_estimador_financieros": 84,
+  "n_sin_vivienda": 591691,
+  "lift_estimador_vivienda": 1.0563759639070782,
+  "decision_perfil_incompleto": {
+    "crear_bandera_unica": false,
+    "lift": 1.0563759639070782,
+    "umbral": 1.5
+  }
+}

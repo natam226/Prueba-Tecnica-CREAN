@@ -1,0 +1,26 @@
+{
+  "mae": 30067086.139143016,
+  "mape": 22558.0950510539,
+  "mape_mediana": 4.322037601676541,
+  "n": 212176,
+  "n_mape": 145126,
+  "n_meses_historia": 13,
+  "n_meses_validacion": 3,
+  "n_clientes_con_historial": 219542,
+  "componentes": {
+    "app": {
+      "mae": 13976975.215917211,
+      "mape": 13297.057178554342,
+      "mape_mediana": 1.0015536483158418,
+      "n": 212176,
+      "n_mape": 20235
+    },
+    "prod_conservadores": {
+      "mae": 18434686.647955664,
+      "mape": 7303.649248820019,
+      "mape_mediana": 5.039499535111035,
+      "n": 212176,
+      "n_mape": 136600
+    }
+  }
+}

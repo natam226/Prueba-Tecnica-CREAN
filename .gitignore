@@ -3,7 +3,20 @@ venv/
 bronce/data/
 plata/data/
 oro/data/
-outputs/
+# De outputs/ se versiona la EVIDENCIA (decisiones, metricas, validacion
+# estadistica), no los datos regenerables: outputs/powerbi/ son cientos de MB
+# -- fact_saldos_mensual tiene 9.9 M filas -- y los .pkl son binarios que se
+# reconstruyen corriendo el pipeline. Git no entra a un directorio excluido,
+# asi que hay que reincluir nivel por nivel.
+outputs/*
+!outputs/decisiones/
+!outputs/eda/
+!outputs/models/
+outputs/models/*.pkl
+# Volcados de poblacion a nivel cliente (860 mil filas cada uno, 34 MB juntos):
+# son datos regenerables, no evidencia de una decision.
+outputs/eda/poblacion_*.csv
+
 __pycache__/
 *.pyc
 .ipynb_checkpoints/

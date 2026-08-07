@@ -1,0 +1,50 @@
+{
+  "auc": 0.8861190194641916,
+  "conclusion": "ausencia informativa",
+  "accion": "bandera_predictora_sin_imputacion_global",
+  "imputar": false,
+  "bandera_como_predictora": true,
+  "documentar_variables_asociadas": true,
+  "top_10_variables": [
+    {
+      "variable": "saldo_liquido_total",
+      "importancia": 0.09083880443778017
+    },
+    {
+      "variable": "bolsillos_saldo_prom_6m",
+      "importancia": 0.05558686783949338
+    },
+    {
+      "variable": "ingresos_mensuales",
+      "importancia": 0.0456693680117088
+    },
+    {
+      "variable": "bolsillos_tenencia",
+      "importancia": 0.016301224192451037
+    },
+    {
+      "variable": "total_activos",
+      "importancia": 0.012621617617500514
+    },
+    {
+      "variable": "cuenta_ahorro_tenencia",
+      "importancia": 0.012611936749270369
+    },
+    {
+      "variable": "bolsillos_tendencia_6m",
+      "importancia": 0.009275446604241334
+    },
+    {
+      "variable": "antiguedad_relacion_meses",
+      "importancia": 0.007933386114620977
+    },
+    {
+      "variable": "n_productos_no_etiqueta",
+      "importancia": 0.006664940422885679
+    },
+    {
+      "variable": "bolsillos_tendencia_relativa_6m",
+      "importancia": 0.005718463102011006
+    }
+  ]
+}

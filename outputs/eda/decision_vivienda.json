@@ -1,0 +1,55 @@
+{
+  "accion": "conservar_categorica_con_sin_dato",
+  "conservar_categorica": true,
+  "conservar_bandera": false,
+  "iv_categorica": 0.12069477777090441,
+  "iv_bandera": 0.10825052672239739,
+  "umbral": 0.02,
+  "comparacion_sesgo_captura": [
+    {
+      "variable": "total_patrimonio",
+      "mediana_con_dato": 24000000.0,
+      "mediana_sin_dato": 3952000.0,
+      "p_valor": 0.0
+    },
+    {
+      "variable": "ingresos_mensuales",
+      "mediana_con_dato": 2500000.0,
+      "mediana_sin_dato": 1938493.5,
+      "p_valor": 0.0
+    },
+    {
+      "variable": "n_productos_no_etiqueta",
+      "mediana_con_dato": 1.0,
+      "mediana_sin_dato": 1.0,
+      "p_valor": 0.0
+    }
+  ],
+  "tasa_por_nivel": [
+    {
+      "desc_tipo_de_vivienda": "ARRENDADA",
+      "n_clientes": 45949,
+      "tasa_adopcion": 0.07262399616966637
+    },
+    {
+      "desc_tipo_de_vivienda": "FAMILIAR",
+      "n_clientes": 129359,
+      "tasa_adopcion": 0.11125627130698289
+    },
+    {
+      "desc_tipo_de_vivienda": "NO INFORMA",
+      "n_clientes": 18190,
+      "tasa_adopcion": 0.0919736118746564
+    },
+    {
+      "desc_tipo_de_vivienda": "PROPIA",
+      "n_clientes": 75034,
+      "tasa_adopcion": 0.11895940506970173
+    },
+    {
+      "desc_tipo_de_vivienda": "Sin dato",
+      "n_clientes": 591691,
+      "tasa_adopcion": 0.05629289612314536
+    }
+  ]
+}

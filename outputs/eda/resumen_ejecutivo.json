@@ -1,0 +1,48 @@
+{
+  "n_clientes_total": 860223,
+  "n_clientes_priorizados_A_B": 430112,
+  "n_nivel_A": 215057,
+  "n_nivel_A_con_historial": 132368,
+  "n_nivel_A_sin_historial": 82689,
+  "entrada_bruta_12m": 1859309351232.0254,
+  "n_clientes_entrada": 179405,
+  "salida_bruta_12m": -760258559891.438,
+  "n_clientes_salida": 40137,
+  "neto_12m": 1099050791340.5874,
+  "oportunidad_12m_conservador": -2370736025619.5767,
+  "oportunidad_12m_base": 1099050791340.5874,
+  "oportunidad_12m_optimista": 3099577625590.368,
+  "n_clientes_con_monto": 219542,
+  "niveles_sin_senal_de_monto": [
+    "B",
+    "C"
+  ],
+  "aviso_agregado_ingenuo": {
+    "metodo": "suma_de_limites_p10_p90_por_cliente",
+    "supuesto_implicito": "errores_de_backtest_perfectamente_correlacionados_entre_clientes",
+    "n_clientes": 219542,
+    "raiz_n": 468.553091975712,
+    "factor_escala_medido_ancho_agregado_sobre_ancho_medio_cliente": 219542.0,
+    "ancho_relativo_correlacion_perfecta": 4.977307413188274,
+    "ancho_relativo_independencia": 0.01062271810479543,
+    "recomendacion": "no_citar_el_rango_agregado; usar_los_escenarios_de_captura_de_la_celda_siguiente"
+  },
+  "escenarios_captura": {
+    "formula": "entrada_bruta_12m * tasa_de_captura",
+    "base_de_calculo": 1859309351232.0254,
+    "escenarios": {
+      "conservador": {
+        "tasa_captura": 0.1,
+        "oportunidad_12m": 185930935123.20255
+      },
+      "base": {
+        "tasa_captura": 0.25,
+        "oportunidad_12m": 464827337808.00635
+      },
+      "optimista": {
+        "tasa_captura": 0.4,
+        "oportunidad_12m": 743723740492.8102
+      }
+    }
+  }
+}

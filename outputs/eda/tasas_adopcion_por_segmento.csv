@@ -1,0 +1,19 @@
+variable,categoria,tasa_adopcion,n_clientes
+grupo_edad,18-25,0.03277173913043478,110400
+grupo_edad,26-35,0.07634712221751612,212490
+grupo_edad,36-49,0.09515502975574525,236761
+grupo_edad,50-65,0.07998333680483233,163234
+grupo_edad,65+,0.045216910104996434,137338
+desc_genero,femenino,0.08340703564370681,472622
+desc_genero,masculino,0.057336809230054464,387430
+desc_genero,no binario,0.044444444444444446,45
+desc_genero,trans,0.0,33
+desc_genero,,0.0,93
+desc_segmento,personal,0.03419353839961608,645970
+desc_segmento,plus,0.164715002652087,196072
+desc_segmento,preferencial,0.39887794950772787,18181
+desc_tipo_de_vivienda,ARRENDADA,0.07262399616966637,45949
+desc_tipo_de_vivienda,FAMILIAR,0.11125627130698289,129359
+desc_tipo_de_vivienda,NO INFORMA,0.0919736118746564,18190
+desc_tipo_de_vivienda,PROPIA,0.11895940506970173,75034
+desc_tipo_de_vivienda,,0.05629289612314536,591691

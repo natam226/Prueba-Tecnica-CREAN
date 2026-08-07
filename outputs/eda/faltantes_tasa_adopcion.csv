@@ -1,0 +1,3 @@
+falta_estimador,n_clientes,n_adoptadores,tasa_adopcion,grupo,diferencia_vs_con_estimador,chi2,p_valor,gl
+0,745792,61136,0.0819745988157556,con estimador,-0.07760515347314739,8981.326719347966,0.0,1
+1,114431,500,0.00436944534260821,sin estimador,-0.07760515347314739,8981.326719347966,0.0,1

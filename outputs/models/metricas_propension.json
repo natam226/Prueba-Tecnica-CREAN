@@ -1,0 +1,16 @@
+{
+  "modelo_a": {
+    "auc": 0.8942246185377238,
+    "n_features": 73
+  },
+  "modelo_b": {
+    "auc": 0.8375329373435932,
+    "n_features": 30
+  },
+  "modelo_a_solo_con_productos": {
+    "auc": 0.8241176620414581,
+    "n": 105997
+  },
+  "n_entrenables": 860153,
+  "tasa_adopcion": 0.07165701915821952
+}

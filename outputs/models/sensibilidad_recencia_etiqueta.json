@@ -1,0 +1,16 @@
+{
+  "auc_principal": 0.8942246185377238,
+  "auc_reciente": 0.8908885319792668,
+  "spearman_rho": 0.9895225225382721,
+  "spearman_p": 0.0,
+  "pct_clientes_cambian_nivel": 0.09706687819895367,
+  "n_clientes_comparados": 529470,
+  "distribucion_distancia_nivel": {
+    "0": 478076,
+    "1": 51045,
+    "2": 296,
+    "3": 53
+  },
+  "n_distancia_2_o_mas": 349,
+  "pct_distancia_2_o_mas": 0.0006591497157534893
+}

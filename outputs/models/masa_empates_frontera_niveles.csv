@@ -1,0 +1,3 @@
+poblacion,n_clientes,valor_modal,n_en_valor_modal,pct_en_valor_modal,n_valores_distintos_multinivel,n_valores_distintos_frontera_ab,n_clientes_en_frontera_ab,pct_clientes_en_frontera_ab
+con_historial,529470,0.003137174193801549,420,0.0007932460762649442,0,0,0,0.0
+sin_historial,330753,0.0,24825,0.07505600856228062,0,0,0,0.0
