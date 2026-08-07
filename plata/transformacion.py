@@ -111,11 +111,22 @@ def construir_saldos_mensual():
     Con cortes por fuente cada cliente-producto queda medido en un momento
     distinto; con un `mes_max` compartido, ninguna fuente aporta meses que
     las demás no puedan ver.
+
+    `construir_panel_mensual` bucketea a granularidad de MES (toma la última
+    fila dentro de cada mes). `FECHA_CORTE` es una fecha exacta (día), y las
+    5 fuentes terminan en días distintos dentro de ese mismo mes de corte
+    (p.ej. bolsillos el día 1, CDT el día 30). Sin un filtro a nivel de día
+    ANTES de bucketear, el mes de corte terminaría representando "lo último
+    visto por cada fuente" en vez de "lo último visto al mismo instante para
+    todas" — exactamente lo que D4 prohíbe. Por eso se trunca cada fuente a
+    `fecha <= FECHA_CORTE` (día exacto, igual que `agregar_serie_saldo`) antes
+    de pasarla a `construir_panel_mensual`.
     """
     fecha_corte = _fecha_corte()
     paneles = []
     for tabla, normalizar in FUENTES_SALDO:
         df = _leer_fuente_saldo(tabla, normalizar)
+        df = df[pd.to_datetime(df["fecha"]) <= fecha_corte]
         panel = construir_panel_mensual(
             df, group_cols=["numero_id", "producto"], mes_max=fecha_corte)
         paneles.append(panel)
@@ -144,27 +155,41 @@ def _stats_corte_fuente(df, fecha_corte):
     corte global (D4: "Registrar cuántos registros quedan fuera por fuente al
     aplicar el corte global"). `panel_mensual` es genérico y no reporta esto
     porque no conoce la procedencia de cada fila; este es el call site que sí
-    la conoce (Task 7)."""
-    idx_corte = fecha_corte.year * 12 + (fecha_corte.month - 1)
+    la conoce (Task 7).
+
+    Comparación a nivel de DÍA (no de mes): es la misma granularidad que
+    `construir_saldos_mensual` aplica ahora antes de bucketear (ver su
+    docstring) y la misma que usa `agregar_serie_saldo`. Con corte a nivel de
+    mes, una fuente con datos hasta el día 30 del mes de corte parecía no
+    perder nada aunque en la práctica aportaba hasta 29 días de actividad que
+    otras fuentes, cortadas antes en ese mismo mes, no tenían — justo lo que
+    D4 busca evitar.
+    """
     d = df.copy()
     d["fecha"] = pd.to_datetime(d["fecha"])
-    idx_mes = d["fecha"].dt.year * 12 + (d["fecha"].dt.month - 1)
+    posteriores = d["fecha"] > fecha_corte
 
-    primer_mes_grupo = d.groupby(["numero_id", "producto"])["fecha"].min()
-    idx_primer_mes_grupo = primer_mes_grupo.dt.year * 12 + (primer_mes_grupo.dt.month - 1)
+    grupos_totales = d.groupby(["numero_id", "producto"]).ngroups
+    grupos_con_dato_valido = d.loc[~posteriores].groupby(["numero_id", "producto"]).ngroups
 
     return {
         "filas_totales": len(d),
-        "filas_posteriores_al_corte": int((idx_mes > idx_corte).sum()),
-        "grupos_totales": len(primer_mes_grupo),
-        "grupos_omitidos_por_corte": int((idx_primer_mes_grupo > idx_corte).sum()),
+        "filas_posteriores_al_corte": int(posteriores.sum()),
+        "grupos_totales": grupos_totales,
+        # grupo sin NINGUNA fila <= fecha_corte: `construir_panel_mensual` no
+        # tiene nada que bucketear para él y lo omite por completo (0 filas).
+        "grupos_omitidos_por_corte": grupos_totales - grupos_con_dato_valido,
+        "fecha_max_fuente": d["fecha"].max(),
     }
 
 
 def reportar_recorte_por_fuente():
     """D4: por cada una de las 5 fuentes de saldo, cuántas filas quedan por
-    encima del corte global (no se usan) y cuántos grupos cliente-producto se
-    omiten por completo del panel (su primer mes real es posterior al corte).
+    encima del corte global — a nivel de día — y no se usan, cuántos grupos
+    cliente-producto se omiten por completo del panel (ninguna fila suya cae
+    en o antes del corte), y el día máximo real de cada fuente frente a
+    `FECHA_CORTE`, para que se vea de un vistazo el desfase que el truncado
+    por día corrige.
     """
     fecha_corte = _fecha_corte()
     return {
@@ -200,10 +225,13 @@ if __name__ == "__main__":
     print(f"primer_registro_plata: {len(primer)} filas")
 
     # D4: registrar cuántos registros quedan fuera por fuente al aplicar el corte global
-    print(f"D4 - corte global aplicado (FECHA_CORTE={_fecha_corte().date()}):")
+    fecha_corte = _fecha_corte()
+    print(f"D4 - corte global aplicado (FECHA_CORTE={fecha_corte.date()}), por fuente:")
     for tabla, stats in reportar_recorte_por_fuente().items():
+        desfase_dias = (stats["fecha_max_fuente"] - fecha_corte).days
         print(
-            f"  {tabla}: "
+            f"  {tabla}: max real={stats['fecha_max_fuente'].date()} "
+            f"(+{desfase_dias}d vs corte) -> "
             f"{stats['filas_posteriores_al_corte']}/{stats['filas_totales']} filas "
             f"posteriores al corte descartadas, "
             f"{stats['grupos_omitidos_por_corte']}/{stats['grupos_totales']} "

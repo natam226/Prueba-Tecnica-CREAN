@@ -3,7 +3,9 @@ import pandas as pd
 
 import config
 from src.db_io import escribir_tabla_sqlite, leer_tabla_sqlite
-from plata.transformacion import construir_saldos_mensual, construir_primer_registro
+from plata.transformacion import (
+    construir_saldos_mensual, construir_primer_registro, reportar_recorte_por_fuente,
+)
 
 
 def _bronce_minimo(bronce_db):
@@ -73,3 +75,64 @@ def test_primer_registro_toma_el_minimo_entre_todas_las_fuentes(tmp_path, monkey
     r = leer_tabla_sqlite(plata_db, "primer_registro_plata").set_index("numero_id")
     assert pd.Timestamp(r.loc[1, "primer_mes"]) == pd.Timestamp("2026-01-01")
     assert pd.Timestamp(r.loc[2, "primer_mes"]) == pd.Timestamp("2026-02-01")
+
+
+def _bronce_con_fila_intrames_posterior_al_corte(bronce_db):
+    """4 de las 5 fuentes terminan exactamente el 2026-02-01; `crean_aho_cte`
+    tiene una fila extra el 2026-02-15 — MISMO mes de corte, DÍA posterior.
+    FECHA_CORTE = min(max_fecha por fuente) = 2026-02-01 de todas formas
+    (aho_cte no es la fuente que fija el mínimo). Pin de la regresión D4:
+    sin truncar por día antes de bucketear a mes, `construir_panel_mensual`
+    tomaría la fila del 02-15 (saldo=999.0) como "el" valor de febrero para
+    aho_cte, aunque ninguna otra fuente ve nada después del día 1."""
+    escribir_tabla_sqlite(
+        pd.DataFrame({
+            "fecha": ["2026-01-10", "2026-02-01", "2026-02-15"],
+            "numero_id": [1, 1, 1],
+            "producto": ["CUENTA DE AHORRO"] * 3,
+            "saldo": [100.0, 200.0, 999.0],
+        }),
+        bronce_db, "crean_aho_cte",
+    )
+    for tabla, producto in [("crean_bolsillos", "BOLSILLOS"),
+                            ("crean_fiducuenta", "FIDUCUENTA"),
+                            ("invesbot", "INVESBOT")]:
+        escribir_tabla_sqlite(
+            pd.DataFrame({"fecha": ["2026-02-01"], "numero_id": [2],
+                          "producto": [producto], "saldo": [50.0]}),
+            bronce_db, tabla,
+        )
+    escribir_tabla_sqlite(
+        pd.DataFrame({"fecha": ["2026-02-01"], "numero_id": [1],
+                      "producto": ["CDT"], "saldo": [7.0]}),
+        bronce_db, "crean_inv_virtual_cdt",
+    )
+
+
+def test_saldos_mensual_trunca_por_dia_no_solo_por_mes(tmp_path, monkeypatch):
+    bronce_db = tmp_path / "bronce.db"
+    plata_db = tmp_path / "plata.db"
+    monkeypatch.setattr(config, "BRONCE_DB", bronce_db)
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+    _bronce_con_fila_intrames_posterior_al_corte(bronce_db)
+
+    construir_saldos_mensual()
+    r = leer_tabla_sqlite(plata_db, "saldos_mensual_plata")
+    r["mes"] = pd.to_datetime(r["mes"])
+
+    # La fila del 2026-02-15 (saldo=999.0) queda por ENCIMA del corte
+    # (2026-02-01), aunque caiga en el mismo mes calendario. No debe influir
+    # en `saldo_mes` de febrero: ese mes debe quedar en 200.0 (la fila del
+    # día 01, la única <= FECHA_CORTE), no en 999.0.
+    ahorro = r[(r["numero_id"] == 1) & (r["producto"] == "cuenta_ahorro")].sort_values("mes")
+    assert ahorro["mes"].tolist() == [pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-01")]
+    assert ahorro["saldo_mes"].tolist() == [100.0, 200.0]
+    assert 999.0 not in ahorro["saldo_mes"].tolist()
+    assert ahorro["observado"].tolist() == [1, 1]   # ambos meses tienen fila real <= corte
+
+    # D4: el reporte por fuente debe reflejar la fila descartada a nivel de día.
+    stats = reportar_recorte_por_fuente()
+    assert stats["crean_aho_cte"]["filas_totales"] == 3
+    assert stats["crean_aho_cte"]["filas_posteriores_al_corte"] == 1
+    assert stats["crean_aho_cte"]["grupos_omitidos_por_corte"] == 0
+    assert stats["crean_aho_cte"]["fecha_max_fuente"] == pd.Timestamp("2026-02-15")
