@@ -19,10 +19,10 @@ COLUMNAS_TIPICAS = [
     "n_productos_inversion_no_etiqueta", "saldo_invertido_no_etiqueta",
     "invesbot_saldo_snapshot", "inversion_virtual_tendencia_6m",
     "desc_genero", "grupo_edad", "desc_tipo_de_vivienda", "desc_segmento",
-    # Task 2B: `_pivotear_producto` dejó de eliminar `fecha_snapshot` para poder
+    # `_pivotear_producto` dejó de eliminar `fecha_snapshot` para poder
     # derivar `dias_desde_ultimo_dato`, así que estas columnas datetime-string
     # SÍ existen en la tabla real y el fixture debe reflejarlo (ver bug de
-    # integración detectado en Task 5: HistGradientBoostingClassifier no puede
+    # integración detectado al entrenar: HistGradientBoostingClassifier no puede
     # entrenar con un string de fecha).
     "cdt_fecha_snapshot", "fiducuenta_fecha_snapshot",
     "cuenta_ahorro_fecha_snapshot", "cuenta_corriente_fecha_snapshot",
@@ -75,13 +75,13 @@ def test_modelo_b_conserva_capacidad_financiera_y_derivadas():
 def test_modelo_a_excluye_etiqueta_alternativa_de_sensibilidad():
     # D0.2/N4: etiqueta_adopcion_reciente es OTRA etiqueta (ventana alternativa),
     # no una predictora. No está en COLUMNAS_TIPICAS del brief, pero SÍ existe en
-    # la tabla real cliente_features (ver Task 3) y debe quedar excluida igual.
+    # la tabla real cliente_features y debe quedar excluida igual.
     feats = features_modelo_a(COLUMNAS_TIPICAS + ["etiqueta_adopcion_reciente"])
     assert "etiqueta_adopcion_reciente" not in feats
 
 
 def test_modelo_a_excluye_fecha_snapshot_por_producto():
-    # Task 2B dejó `{producto}_fecha_snapshot` en la tabla (datetime-string) para
+    # `_pivotear_producto` deja `{producto}_fecha_snapshot` en la tabla (datetime-string) para
     # poder derivar `dias_desde_ultimo_dato`. No es predictora: un modelo de
     # sklearn no puede entrenar con un string de fecha. La forma numérica
     # (`dias_desde_ultimo_dato`) sí debe conservarse.
@@ -94,7 +94,7 @@ def test_modelo_a_excluye_fecha_snapshot_por_producto():
 
 
 def test_modelo_a_excluye_toda_columna_de_fuga_explicita_sin_lanzar():
-    # Regresión: Task 9 agregó n_productos_total a cliente_features. Esa
+    # Regresión: n_productos_total se agregó a cliente_features. Esa
     # columna ya estaba en fuga.COLUMNAS_FUGA_EXPLICITAS (agrega TODOS los
     # productos, incluidos los de la etiqueta), pero features_modelo nunca la
     # excluía por su cuenta, así que sobrevivía al selector y hacía explotar
@@ -137,7 +137,7 @@ def test_modelo_a_excluye_las_columnas_de_fact_cliente_score():
     predictoras. `nivel` y `poblacion` son strings y rompen el fit; `score` es
     la SALIDA del modelo de propensión y se colaría en silencio como entrada.
     Los nombres del plan (`score_propension`/`nivel_prioridad`) no coinciden con
-    los que Task 18 escribió realmente (`score`/`nivel`), que es cómo se escapó."""
+    los que el notebook escribió realmente (`score`/`nivel`), que es cómo se escapó."""
     columnas_merge = COLUMNAS_TIPICAS + [
         "score", "nivel", "poblacion", "modelo_usado",
         "valor_referencia", "tipo_valor_referencia",

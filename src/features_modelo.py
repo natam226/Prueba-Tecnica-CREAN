@@ -29,8 +29,9 @@ COLUMNAS_NO_FEATURE = frozenset({
     "monto_conservador_12m",
     "monto_base_12m",
     "monto_optimista_12m",
-    # Nombres REALES de las columnas de fact_cliente_score (Task 18). El plan
-    # las había anticipado como `score_propension` / `nivel_prioridad`, pero la
+    # Nombres REALES de las columnas de fact_cliente_score, que escribe
+    # notebooks/02_modelado.ipynb. El diseño inicial las anticipó como
+    # `score_propension` / `nivel_prioridad`, pero la
     # tabla se escribió con `score` / `nivel`, así que los nombres de arriba no
     # las atrapaban. Cualquier notebook que haga merge de fact_cliente_score
     # sobre cliente_features (p.ej. 07_auditoria_sesgo) las arrastraría al set
@@ -54,8 +55,8 @@ COLUMNAS_SENSIBLES_EXCLUIDAS = ("desc_genero",)
 PREFIJOS_EXCLUIDOS_A = PREFIJOS_FUGA
 
 # Sufijos que el Modelo A no puede usar: artefactos intermedios, no predictoras.
-# `{producto}_fecha_snapshot` es un datetime-string que Task 2B dejó de eliminar
-# en `_pivotear_producto` porque `agregar_recencia_dato` lo necesita para derivar
+# `{producto}_fecha_snapshot` es un datetime-string que `_pivotear_producto`
+# ya no elimina, porque `agregar_recencia_dato` lo necesita para derivar
 # `dias_desde_ultimo_dato` (la forma numérica, esa sí predictora, ya está en
 # COLUMNAS_MODELO_B/A). Regla por sufijo -- no por lista de nombres -- para que
 # un producto nuevo no reintroduzca el bug en silencio.

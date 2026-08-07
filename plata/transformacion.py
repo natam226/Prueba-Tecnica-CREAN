@@ -107,7 +107,8 @@ def construir_saldos_mensual():
 
     D4 CAMBIA la propuesta provisional del plan v1 ("cada fuente contra su
     propio máximo"): las 5 fuentes se regularizan contra el MISMO `mes_max`,
-    derivado de `FECHA_CORTE` global (Task 0B, memoizada en `_fecha_corte()`).
+    derivado de `FECHA_CORTE` global (src/fecha_corte.py, memoizada aquí en
+    `_fecha_corte()`).
     Con cortes por fuente cada cliente-producto queda medido en un momento
     distinto; con un `mes_max` compartido, ninguna fuente aporta meses que
     las demás no puedan ver.
@@ -173,7 +174,7 @@ def _stats_corte_fuente(df, fecha_corte):
     corte global (D4: "Registrar cuántos registros quedan fuera por fuente al
     aplicar el corte global"). `panel_mensual` es genérico y no reporta esto
     porque no conoce la procedencia de cada fila; este es el call site que sí
-    la conoce (Task 7).
+    la conoce.
 
     Comparación a nivel de DÍA (no de mes): es la misma granularidad que
     `construir_saldos_mensual` aplica ahora antes de bucketear (ver su

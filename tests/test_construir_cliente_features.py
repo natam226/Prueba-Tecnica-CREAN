@@ -359,7 +359,7 @@ def test_cliente_features_incluye_las_derivadas_de_spec_v2(tmp_path, monkeypatch
         pd.DataFrame({"numero_id": [501], "primer_mes": ["2026-01-01"]}),
         plata_db, "primer_registro_plata")
 
-    # FECHA_CORTE se calcula desde bronce.db (Task 0B): el fixture de esta
+    # FECHA_CORTE se calcula desde bronce.db (src/fecha_corte.py): el fixture de esta
     # tarea no escribe bronce, así que se monkeypatchea directamente.
     monkeypatch.setattr(
         "oro.construir_cliente_features.calcular_fecha_corte",

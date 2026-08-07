@@ -83,8 +83,9 @@ def agregar_recencia_dato(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.D
 def agregar_etiqueta_adopcion_reciente(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.DataFrame:
     """D0, análisis de sensibilidad: etiqueta alternativa que SÍ exige recencia
     (N4: ventana de `config.VENTANA_DIAS_ETIQUETA_RECIENTE` días desde
-    FECHA_CORTE). Solo se usa para comparar contra la etiqueta principal en la
-    Task 18B - la etiqueta principal (`etiqueta_adopcion`) no cambia."""
+    FECHA_CORTE). Solo se usa para comparar contra la etiqueta principal en el
+    análisis de sensibilidad; la etiqueta principal (`etiqueta_adopcion`) no
+    cambia."""
     out = base.copy()
     ventana = config.VENTANA_DIAS_ETIQUETA_RECIENTE
     reciente_invesbot = (
@@ -208,8 +209,8 @@ def construir_cliente_features():
 
     # D9: coeficiente de variación del saldo líquido, ventana fija de 6M desde
     # FECHA_CORTE (misma `fecha_corte` global ya calculada arriba), mínimo de
-    # meses observados (Task 7 ya regulariza todas las fuentes contra ese
-    # mismo mes_max).
+    # meses observados (plata/transformacion.py ya regulariza todas las
+    # fuentes contra ese mismo mes_max).
     panel = leer_tabla_sqlite(config.PLATA_DB, "saldos_mensual_plata")
     panel["mes"] = pd.to_datetime(panel["mes"])
     base = base.merge(

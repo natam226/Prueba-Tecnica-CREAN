@@ -48,7 +48,7 @@ def construir_panel_mensual(df, group_cols, fecha_col="fecha", saldo_col="saldo"
     `mes_max`, el grupo sí produce una fila (la de ese único mes). Esta
     función es un helper genérico y no reporta cuántos grupos caen fuera de
     la ventana; ese conteo (por fuente, D4) es responsabilidad del código
-    que la llama (Task 7), que conoce la procedencia de cada fila.
+    que la llama (plata/transformacion.py), que sí conoce la procedencia.
     """
     group_cols = list(group_cols)
     d = df[group_cols + [fecha_col, saldo_col]].copy()

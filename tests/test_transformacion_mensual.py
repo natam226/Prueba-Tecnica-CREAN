@@ -54,7 +54,7 @@ def test_saldos_mensual_aplica_forward_fill_por_cliente_producto(tmp_path, monke
     assert ahorro["observado"].tolist() == [1, 0]
     # `cdt` (fuente crean_inv_virtual_cdt) solo tiene una fila, en 2026-03-01,
     # que queda POR ENCIMA del corte global (2026-02-01). Por el contrato de
-    # frontera de `construir_panel_mensual` (Task 6, ver src/panel_mensual.py):
+    # frontera de `construir_panel_mensual` (ver src/panel_mensual.py):
     # un grupo cuyo primer mes real es POSTERIOR a mes_max se omite del panel
     # por completo (cero filas) — no se inventa una fila con un saldo que
     # nunca existió antes del corte. Por eso `cdt` NO aparece en este fixture.
