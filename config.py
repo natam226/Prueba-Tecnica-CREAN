@@ -67,3 +67,25 @@ VENTANA_DIAS_ETIQUETA_RECIENTE = 90  # (D0, N4)
 VENTANA_MESES_AGREGACION = 6
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
+
+# --- Escenarios de captura comercial (§7) ---
+# La banda agregada NO se deriva del error del modelo. Los dos extremos
+# estadísticos posibles son ambos absurdos y acotan el problema:
+#   · correlación perfecta (sumar el p10/p90 de cada cliente): banda de ancho
+#     498% de la base, con el extremo inferior en negativo
+#   · independencia (escalar por sqrt(n), n=219,542): ancho de 1.1% de la base
+# La verdad está en medio y NO es estimable: haría falta la correlación de los
+# errores entre clientes, y con una sola ventana temporal no se puede calcular.
+#
+# Eso mismo es el hallazgo: el error del modelo no es la incertidumbre que
+# manda. La que manda es la ADOPCIÓN — cuántos de los clientes identificados
+# efectivamente mueven recursos a la App. Por eso el rango agregado se
+# construye sobre una palanca de negocio explícita y discutible en vez de
+# sobre una precisión estadística que los datos no soportan:
+#
+#     oportunidad_12m = entrada_bruta × tasa_de_captura
+TASAS_CAPTURA = {
+    "conservador": 0.10,
+    "base": 0.25,
+    "optimista": 0.40,
+}
