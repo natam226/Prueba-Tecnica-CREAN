@@ -2,9 +2,8 @@
 
 Pipeline de datos de arquitectura medallion (bronce / plata / oro) sobre SQLite,
 con EDA, modelado, auditoría de sesgo y dimensionamiento de oportunidad en
-Jupyter, y export final para Power BI. Implementa SPEC_V2
-(`docs/superpowers/plans/2026-08-06-pipeline-crean-v2.md`), que corrige y
-amplía el plan v1 original.
+Jupyter, una interfaz de resultados en Streamlit y export final para Power BI.
+Implementa `SPEC_V2.md` con las decisiones de `DECISIONES.md`.
 
 ## Setup
 
@@ -63,21 +62,26 @@ importa:
     "C:\Users\natam\OneDrive\Desktop\Prueba-Tecnica-CREAN\venv\Scripts\python.exe" scripts/export_powerbi.py
     ```
 
+11. **Interfaz de resultados** — lee los artefactos de `outputs/`, no recalcula
+    nada. Corre en local, sin desplegar:
+
+    ```
+    "C:\Users\natam\OneDrive\Desktop\Prueba-Tecnica-CREAN\venv\Scripts\python.exe" -m streamlit run app/tablero.py
+    ```
+
 Los tests (`pytest tests/ -v` o `python -m pytest tests/ -v`) se pueden correr en
 cualquier momento; no dependen de que el pipeline haya corrido (usan fixtures y
 bases de datos temporales).
 
 ## Estado de verificación (léase antes de confiar en cualquier cifra)
 
-El código de los pasos 6-10 (modelado, monto a 12 meses, auditoría de sesgo,
-dimensionamiento, export) fue escrito e integrado contra los módulos y esquemas
-reales del repositorio, pero **los notebooks 05 y 07 no se han ejecutado**
-todavía de punta a punta en esta rama — quedan como entregable listo para
-correr, no como resultado verificado. Las cifras de `fact_auditoria_sesgo.csv`,
-`dimensionamiento.csv` y `resumen_ejecutivo.json` no existen hasta que alguien
-los ejecute. Los pasos 1-7 (bronce/plata/oro, EDA, modelado de propensión,
-monto a 12 meses) sí se han corrido sobre datos reales al menos una vez; las
-cifras de la sección siguiente vienen de esas corridas.
+Los 11 pasos se han ejecutado de punta a punta sobre los datos reales, y las
+cifras de la sección siguiente vienen de esas corridas. El export produce los 8
+archivos y falla explícitamente si falta cualquier insumo, así que un export
+completo es en sí mismo la comprobación de que la cadena corrió entera.
+
+Los notebooks se versionan **con sus salidas**: son parte del entregable, no
+solo el código que las produce.
 
 ## Resultados actuales (medidos, con su contexto — no citar sin él)
 
@@ -103,20 +107,37 @@ cifras de la sección siguiente vienen de esas corridas.
   por componente, y el rango `[conservador, optimista]` usa los percentiles
   10/90 del error (no 25/75, que colapsaba a ancho cero para el componente
   "app"). Ver `DECISIONES.md`, clave `metrica_error_monto`.
-- **El agregado `[conservador, optimista]` de la oportunidad a 12 meses NO es
-  una banda de incertidumbre agregada válida** (hallazgo encontrado durante
-  esta tarea, sin resolver): se construye sumando el límite p10/p90 de cada
-  cliente por separado (~220 mil clientes con historial de inversión), lo que
-  asume que todos caen simultáneamente en su propio peor (o mejor) caso. Bajo
-  independencia razonable la incertidumbre agregada debería escalar con
-  `sqrt(n)`, no con `n` — el rango mostrado está sobrestimado en órdenes de
-  magnitud, y el límite "conservador" agregado puede incluso salir negativo
-  sin que eso signifique que el modelo esté roto. `notebooks/05_dimensionamiento.ipynb`
-  mide esta discrepancia con evidencia real (no simulada), la imprime junto a
-  la cifra, y registra una decisión en el log (`agregacion_rango_oportunidad_12m`)
-  dejando claro que **solo la cifra `base` es defendible como titular** frente
-  al negocio mientras no se decida un método de agregación correcto. Esto es
-  una decisión de negocio pendiente, no resuelta en este notebook a propósito.
+- **Bruto vs neto**: el modelo proyecta el *cambio neto* del saldo invertido,
+  mientras que el brief pide "el monto potencial que podrían invertir", que es
+  un flujo de entrada. Se reportan por separado: **entrada bruta 1,859,309 M
+  COP** (179,405 clientes, la cifra que responde al brief), **salida bruta
+  −760,259 M COP** (40,137 clientes, que es una base de retención accionable y
+  nominada, no un error de signo) y **neto 1,099,051 M COP**. Reportar solo el
+  neto subestima la captación al restarle un problema de negocio distinto.
+- **Los niveles B y C no diferencian monto**: la dispersión del monto dentro de
+  cada uno es exactamente cero — un único valor distinto (17.46 COP) en 42,572
+  y 4,465 clientes respectivamente. El árbol colapsa a una constante en la zona
+  media y el recentrado por mediana la cancela. Siguen siendo cuartiles válidos
+  para **priorizar contacto** (van sobre el score, que sí discrimina), pero no
+  aportan resolución para **dimensionar**, así que `05_dimensionamiento.ipynb`
+  los agrupa en un `bloque_comercial` derivado de la dispersión medida, no de
+  una lista fija.
+- **El rango agregado NO se deriva del error del modelo.** Sumar el p10/p90 de
+  cada uno de los ~220 mil clientes asume que todos caen a la vez en su propio
+  peor (o mejor) caso: da una banda de ancho 498% de la base, con el extremo
+  inferior en negativo. Pero el extremo opuesto tampoco sirve — bajo
+  independencia la banda escala con `sqrt(n)`≈469 en vez de `n` y se reduce a
+  un ancho de 1.1%, precisión que una proyección a 12 meses sobre ~13 meses de
+  historia no puede tener. La correlación real de los errores entre clientes no
+  es estimable con una sola ventana temporal, así que **ninguno de los dos
+  extremos es defendible**. Ese callejón sin salida es el hallazgo: la
+  incertidumbre que manda no es el error del modelo sino la **adopción**. Por
+  eso el rango se construye sobre una palanca de negocio explícita,
+  `oportunidad = entrada_bruta × tasa_de_captura` con la tasa en
+  `config.TASAS_CAPTURA` (10% / 25% / 40% → 185,931 / 464,827 / 743,724 M COP).
+  Los escenarios **por cliente** se conservan y siguen siendo válidos para
+  ordenar; lo que se descarta es su suma. Ver la clave
+  `agregacion_rango_oportunidad_12m` en el log de decisiones.
 
 ## Entregables de Power BI (SPEC_V2 §8)
 
@@ -163,25 +184,30 @@ reporta su conteo de filas):
   `eda/` (resúmenes y CSV de la EDA), `models/` (modelos entrenados, métricas,
   curva precisión/recall), `decisiones/` (log de decisiones, ver abajo),
   `powerbi/` (los 8 CSV finales para Power BI).
+- **app** (`app/tablero.py`): interfaz de resultados en Streamlit, en cuatro
+  vistas — dimensionamiento con simulador de captura, lista de contacto
+  priorizada y descargable, sustento estadístico del modelo, y auditoría de
+  sesgo con los supuestos. Solo lee `outputs/`; si una cifra no cuadra con un
+  notebook, el notebook manda. No carga `fact_saldos_mensual` (9.9 M filas): la
+  serie mensual se agrega en el pipeline, no en la capa de presentación.
 
-## `outputs/` está en `.gitignore` — pendiente de decidir
+## Qué se versiona de `outputs/`
 
-Todo `outputs/` (incluido `outputs/decisiones/log_decisiones.csv`, el log de
-decisiones que SPEC_V2 §10 exige como entregable) está excluido del control de
-versiones. Eso significa que, tal como está configurado hoy, **el log de
-decisiones no queda versionado junto con el código que lo generó** — cada
-corrida local lo regenera (es append-only, así que además crece sin límite si
-se corre el pipeline varias veces sin limpiarlo). Esto no se ha resuelto en
-esta tarea porque es una decisión del usuario, no técnica. Opciones a elegir:
+Se versiona la **evidencia**, no los datos regenerables. Quien revise el
+repositorio necesita ver qué se decidió y con qué respaldo estadístico; no
+necesita 9.9 millones de filas de saldos mensuales que puede reconstruir
+corriendo el pipeline.
 
-1. Sacar `outputs/decisiones/` (o directamente `log_decisiones.csv`) de
-   `.gitignore` y versionarlo como cualquier otro entregable de auditoría.
-2. Exportarlo también a un destino no ignorado (p. ej. dentro de
-   `outputs/powerbi/` si ese directorio se versiona, o a un lugar fuera de
-   `outputs/`).
-3. Dejarlo como está y documentar explícitamente que el log de decisiones es
-   un artefacto de ejecución, no un entregable versionado — y decidir cómo se
-   entrega entonces (adjunto aparte, capturado en el reporte final, etc.).
+| Se versiona | Por qué |
+|---|---|
+| `decisiones/log_decisiones.csv` | trazabilidad de supuestos, exigida por SPEC_V2 §10 |
+| `eda/validacion_variables.csv` | la validación estadística de las 64 variables |
+| `eda/*.json`, `eda/*.png` | resúmenes y patrones de faltantes |
+| `models/*.json`, `models/importancia_permutacion.csv` | métricas y AUC |
+
+Quedan fuera `outputs/powerbi/` (cientos de MB) y `outputs/models/*.pkl`
+(binarios). El log es *append-only*: crece con cada corrida, así que conviene
+limpiarlo antes de una entrega si se corrió el pipeline varias veces.
 
 ## Decisiones de negocio
 
@@ -189,21 +215,10 @@ Las reglas de negocio del pipeline (ventana de agregación, definición de
 `etiqueta_adopcion`, bandas de interpretación del proxy de género, tratamiento
 de `perfil_incompleto`, etc.) están documentadas como código testeable en
 `src/decisiones.py` y registradas, corrida a corrida, en
-`outputs/decisiones/log_decisiones.csv` (ver la sección de arriba sobre por
-qué ese archivo no está versionado). El razonamiento narrativo detrás de cada
-decisión — incluida la corrección de la fuga de etiqueta y la corrección de
-sesgo del modelo de monto — vive en `DECISIONES.md`. Ese archivo (junto con
-`SPEC_V2.md`) vive en la raíz del repositorio principal y, al momento de
-escribir esto, no está presente como archivo trackeado dentro de este
-worktree (`worktree-pipeline-crean-sdd`) ni de `.superpowers/sdd/` — si no lo
-encuentras aquí, búscalo en el checkout principal. El plan de implementación
-sí está versionado en este worktree:
-[`docs/superpowers/plans/2026-08-06-pipeline-crean-v2.md`](docs/superpowers/plans/2026-08-06-pipeline-crean-v2.md).
-La sección **"Preguntas Abiertas"** del plan v1
-([`docs/superpowers/plans/2026-08-05-pipeline-crean.md`](docs/superpowers/plans/2026-08-05-pipeline-crean.md))
-sigue siendo la referencia de qué quedaba pendiente de confirmar antes de
-SPEC_V2; varias de esas preguntas ya fueron resueltas por las decisiones D0-D10
-que SPEC_V2 aplica (ver la cabecera de `DECISIONES.md`).
+`outputs/decisiones/log_decisiones.csv`. El razonamiento narrativo detrás de
+cada decisión — incluida la corrección de la fuga de etiqueta y la corrección
+de sesgo del modelo de monto — vive en `DECISIONES.md`, junto a `SPEC_V2.md`
+en la raíz del repositorio.
 
 ## Nota sobre `numero_id`
 
