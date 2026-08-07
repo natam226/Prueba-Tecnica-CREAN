@@ -1,17 +1,35 @@
-"""Orquestador end-to-end del pipeline bronce -> plata -> oro -> Power BI.
+"""Orquestador del pipeline bronce -> plata -> oro (SPEC_V2).
 
-Ejecuta cada paso importando y llamando directamente su función de entrada
-(en vez de usar subprocess), para evitar reintroducir el problema de sys.path
-con una convención de invocación distinta. Uso:
-
+Uso:
     python scripts/run_pipeline.py
 
-Los notebooks de EDA (01_eda.ipynb) y modelado (02_modelado.ipynb) NO se
-ejecutan aquí: son exploratorios/interactivos por naturaleza y se corren
-manualmente en Jupyter. Desde el Fix 2 de la revisión final, 02_modelado.ipynb
-ya no depende del CSV que produce 01_eda.ipynb, así que pueden ejecutarse en
-cualquier orden entre sí (aunque correr primero la EDA sigue siendo lo
-recomendado, ya que documenta los datos antes de modelar).
+Los notebooks NO se ejecutan aquí (son interactivos), pero a diferencia de la v1
+ahora tienen dependencias reales entre sí. Orden obligatorio:
+
+    1. python scripts/run_pipeline.py          (bronce, plata, oro, esquema estrella)
+    2. notebooks/01_eda.ipynb
+    3. notebooks/03_eda_faltantes.ipynb        -> decide el tratamiento de falta_estimador
+    4. python -m oro.construir_cliente_features (aplica la decisión de perfil_incompleto)
+    5. notebooks/04_validacion_variables.ipynb -> IV/WoE, decisión de vivienda
+    6. notebooks/02_modelado.ipynb             -> modelos A y B, fact_cliente_score
+    7. notebooks/06_monto_12m.ipynb            -> monto a 12m, actualiza fact_cliente_score
+    8. notebooks/07_auditoria_sesgo.ipynb      -> fact_auditoria_sesgo.csv
+    9. notebooks/05_dimensionamiento.ipynb     -> dimensionamiento.csv
+   10. python scripts/export_powerbi.py        (falla si falta algún insumo)
+
+Por qué el orden 3 -> 4 es obligatorio y no solo recomendado: paso 4 vuelve a
+ejecutar `oro/construir_cliente_features.py`, que lee
+`outputs/eda/faltantes_solapamiento.json` para decidir si crea la bandera
+`perfil_incompleto` (lift condicional, D7). Ese JSON lo produce el paso 3. Si
+se ejecuta el paso 4 sin haber corrido antes el paso 3, `cliente_features` no
+refleja la decisión medida y los pasos 5-9 quedan corriendo sobre datos
+potencialmente desactualizados.
+
+Los pasos 7-9 se auto-referencian sobre `fact_cliente_score`: 6 la crea, 7 la
+actualiza con las columnas de monto y recalcula `nivel`, y 8/9 la leen ya
+actualizada. Ejecutar 8 o 9 antes de 7 no falla con una excepción clara: los
+CSV resultantes simplemente no tendrán las columnas de monto o usarán niveles
+sin recalcular, así que el orden importa aunque no esté forzado en código.
 """
 import sys
 from pathlib import Path
@@ -23,7 +41,6 @@ import bronce.diagnostico_calidad as diagnostico_calidad
 import plata.transformacion as transformacion
 import oro.construir_cliente_features as construir_cliente_features
 import oro.construir_esquema_estrella as construir_esquema_estrella
-import scripts.export_powerbi as export_powerbi
 
 
 def paso(nombre, fn):
@@ -39,6 +56,9 @@ def _run_plata_transformacion():
         transformacion.transformar_producto_unico(tabla_bronce, tabla_plata_destino)
     transformacion.transformar_cdt_inversion_virtual()
     transformacion.transformar_estimador_ingresos()
+    # SPEC_V2 §6.3.1 y §8: panel mensual con forward fill + primer registro
+    transformacion.construir_saldos_mensual()
+    transformacion.construir_primer_registro()
 
 
 def main():
@@ -47,13 +67,9 @@ def main():
     paso("plata: transformaciones", _run_plata_transformacion)
     paso("oro: cliente_features", construir_cliente_features.construir_cliente_features)
     paso("oro: esquema estrella", construir_esquema_estrella.construir_esquema_estrella)
-    print(
-        "NOTA: los notebooks 01_eda.ipynb y 02_modelado.ipynb NO se ejecutan "
-        "automáticamente (son exploratorios/interactivos) — correrlos manualmente "
-        "en Jupyter antes o después de este paso, según se necesite.\n"
-    )
-    paso("Power BI: export", export_powerbi.main)
-    print("Pipeline completo (excepto notebooks).")
+    print(__doc__.split("Orden obligatorio:")[1])
+    print("Pipeline de datos completo. Ejecutar los notebooks en el orden de arriba "
+          "y después `python scripts/export_powerbi.py`.")
 
 
 if __name__ == "__main__":
