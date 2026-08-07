@@ -136,11 +136,29 @@ def construir_saldos_mensual():
 
 
 def construir_primer_registro():
-    """Primer mes con registro del cliente en CUALQUIER fuente de saldo.
-    Insumo de `antiguedad_relacion_meses` (SPEC_V2 §5)."""
+    """Primer mes con registro del cliente en fuentes de saldo NO-etiqueta.
+    Insumo de `antiguedad_relacion_meses` (SPEC_V2 §5, D8).
+
+    D8 AMENDADA (leak-fix, ver
+    .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+    la redacción original decía "primer registro del cliente en CUALQUIER
+    fuente". Ese MIN incluía a Invesbot/Inversión Virtual
+    (`config.PRODUCTOS_ETIQUETA`), los dos productos que DEFINEN
+    `etiqueta_adopcion` -- para ~32% de los adoptantes, el registro más
+    antiguo del cliente estaba precisamente en uno de esos dos productos, así
+    que `antiguedad_relacion_meses` terminaba siendo una función directa de
+    la etiqueta en vez de una medida genuina de antigüedad. Se filtran las
+    filas de producto-etiqueta ANTES de tomar el mínimo por cliente (no la
+    fuente completa: `crean_inv_virtual_cdt` mezcla CDT -- no-etiqueta -- con
+    Inversión Virtual -- etiqueta -- en la misma tabla bronce). Un cliente
+    cuyo ÚNICO registro esté en una fuente-etiqueta queda deliberadamente
+    fuera de `primer_registro_plata`: no hay señal de antigüedad no-etiqueta
+    para él bajo esta definición.
+    """
     minimos = []
     for tabla, normalizar in FUENTES_SALDO:
         df = _leer_fuente_saldo(tabla, normalizar)
+        df = df[~df["producto"].isin(config.PRODUCTOS_ETIQUETA)]
         minimos.append(primer_mes_por_grupo(df, group_cols=["numero_id"]))
     resultado = (
         pd.concat(minimos, ignore_index=True)

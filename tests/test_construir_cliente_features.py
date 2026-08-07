@@ -212,8 +212,18 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
 
 def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
     """D0: dias_desde_ultimo_dato es el máximo de fecha_snapshot entre las 5
-    fuentes de saldo (N1); etiqueta_adopcion_reciente exige que el snapshot de
-    Invesbot/Inversión Virtual esté dentro de la ventana de recencia (N4)."""
+    fuentes de saldo NO-etiqueta (N1); etiqueta_adopcion_reciente exige que el
+    snapshot de Invesbot/Inversión Virtual esté dentro de la ventana de
+    recencia (N4).
+
+    Leak-fix (ver leakage-investigation.md): `dias_desde_ultimo_dato` /
+    `sin_dato_reciente` YA NO miran invesbot/inversion_virtual. 601 y 602
+    solo tienen fila en invesbot (fuente-etiqueta) -> para ambos ya no hay
+    NINGÚN dato no-etiqueta, así que quedan en NULO / sin_dato_reciente=1,
+    aunque 601 tenga un snapshot de invesbot "reciente". Ese es el
+    comportamiento correcto bajo la nueva definición: no tenemos señal de
+    recencia no-etiqueta para ellos, con independencia de qué tan reciente
+    sea su dato de Invesbot."""
     plata_db = tmp_path / "plata.db"
     oro_db = tmp_path / "oro.db"
     monkeypatch.setattr(config, "PLATA_DB", plata_db)
@@ -251,10 +261,64 @@ def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
     assert r.loc[602, "etiqueta_adopcion_reciente"] == 0   # fuera de la ventana de 90 días
     assert r.loc[603, "etiqueta_adopcion_reciente"] == 0
 
-    assert r.loc[601, "dias_desde_ultimo_dato"] == 17
+    # Los tres carecen de dato NO-etiqueta (601/602 solo tienen invesbot,
+    # 603 no tiene nada): los tres quedan en NULO / sin_dato_reciente=1.
+    assert pd.isna(r.loc[601, "dias_desde_ultimo_dato"])
+    assert pd.isna(r.loc[602, "dias_desde_ultimo_dato"])
     assert pd.isna(r.loc[603, "dias_desde_ultimo_dato"])
+    assert r.loc[601, "sin_dato_reciente"] == 1
+    assert r.loc[602, "sin_dato_reciente"] == 1
     assert r.loc[603, "sin_dato_reciente"] == 1
-    assert r.loc[601, "sin_dato_reciente"] == 0
+
+
+def test_recencia_de_dato_excluye_productos_de_etiqueta(tmp_path, monkeypatch):
+    """Pin explícito del mecanismo de fuga corregido: cuando un cliente TIENE
+    dato no-etiqueta ademas de un snapshot (más reciente) en un producto de
+    etiqueta, `dias_desde_ultimo_dato` debe basarse en el no-etiqueta, no en
+    el de etiqueta -- aunque este último sea el máximo global."""
+    plata_db = tmp_path / "plata.db"
+    oro_db = tmp_path / "oro.db"
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+    monkeypatch.setattr(config, "ORO_DB", oro_db)
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-06-01"))
+
+    escribir_tabla_sqlite(
+        _clientes_plata([611], sin_dato_financiero_total=[False]),
+        plata_db, "clientes_plata")
+
+    vacia = _plata_vacia_producto()
+    escribir_tabla_sqlite(vacia, plata_db, "bolsillos_plata")
+    escribir_tabla_sqlite(vacia, plata_db, "fiducuenta_plata")
+
+    # cuenta_ahorro (no-etiqueta): snapshot en 2026-04-01 (61 días antes del corte).
+    escribir_tabla_sqlite(
+        pd.DataFrame([_tabla_producto(611, "cuenta_ahorro", saldo_snapshot=200.0,
+                                       fecha_snapshot="2026-04-01")]),
+        plata_db, "aho_cte_plata")
+    # invesbot (etiqueta): snapshot en 2026-05-30, MÁS reciente que cuenta_ahorro
+    # (solo 2 días antes del corte) -- sería el máximo global si no se excluyera.
+    escribir_tabla_sqlite(
+        pd.DataFrame([_tabla_producto(611, "invesbot", saldo_snapshot=500.0,
+                                       fecha_snapshot="2026-05-30")]),
+        plata_db, "invesbot_plata")
+    escribir_tabla_sqlite(
+        pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
+                              "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"]),
+        plata_db, "cdt_inversion_virtual_plata")
+
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
+        plata_db, "estimador_ingresos_plata")
+    _panel_y_primer_registro_vacios(plata_db)
+
+    r = construir_cliente_features().set_index("numero_id")
+
+    # Si invesbot NO se excluyera, esto daría 2 (2026-06-01 - 2026-05-30).
+    # Con la exclusión correcta, se basa en cuenta_ahorro: 61 días.
+    assert r.loc[611, "dias_desde_ultimo_dato"] == 61
+    assert r.loc[611, "sin_dato_reciente"] == 0
 
 
 def test_cliente_features_incluye_las_derivadas_de_spec_v2(tmp_path, monkeypatch):

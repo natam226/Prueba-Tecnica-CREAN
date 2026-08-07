@@ -15,6 +15,14 @@ from src.fecha_corte import calcular_fecha_corte
 
 PRODUCTOS = config.PRODUCTOS
 
+# Leak-fix (ver .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+# fuentes admitidas para `dias_desde_ultimo_dato`/`sin_dato_reciente` (D0) y,
+# vía plata/transformacion.py::construir_primer_registro, para
+# `antiguedad_relacion_meses` (D8). Invesbot / Inversión Virtual quedan
+# excluidos de ambas agregaciones: incluirlos convertía cada variable en una
+# función directa de `etiqueta_adopcion` para ~31-32% de los adoptantes.
+PRODUCTOS_NO_ETIQUETA = [p for p in PRODUCTOS if p not in config.PRODUCTOS_ETIQUETA]
+
 TABLAS_PRODUCTO = {
     "cuenta_ahorro": "aho_cte_plata",
     "cuenta_corriente": "aho_cte_plata",
@@ -46,11 +54,21 @@ def agregar_recencia_dato(base: pd.DataFrame, fecha_corte: pd.Timestamp) -> pd.D
     """D0, requisito 1: control de calidad de dato por cliente (N1).
 
     `dias_desde_ultimo_dato` = FECHA_CORTE - máxima fecha_snapshot entre las 5
-    fuentes de saldo. Un cliente sin NINGUNA fila de producto queda en NULO +
-    bandera `sin_dato_reciente`, nunca en 0 ni en un valor grande arbitrario.
+    fuentes de saldo NO-etiqueta (`PRODUCTOS_NO_ETIQUETA`: excluye Invesbot e
+    Inversión Virtual). Confirmed leak fix: incluir esas dos fuentes en el MAX
+    hacía que, para ~31% de los adoptantes, "hace cuánto vimos a este
+    cliente" fuera en realidad "hace cuánto se registró su snapshot de
+    Invesbot/Inversión Virtual" -- una función directa de `etiqueta_adopcion`
+    (ver .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md
+    §3). Un cliente sin NINGUNA fila de producto no-etiqueta queda en NULO +
+    bandera `sin_dato_reciente`, nunca en 0 ni en un valor grande arbitrario;
+    esto incluye, deliberadamente, al cliente cuyo ÚNICO dato está en
+    Invesbot/Inversión Virtual -- no hay señal de recencia no-etiqueta para
+    él bajo esta definición, con independencia de qué tan reciente sea su
+    dato de etiqueta.
     """
     out = base.copy()
-    fecha_cols = [f"{p}_fecha_snapshot" for p in PRODUCTOS]
+    fecha_cols = [f"{p}_fecha_snapshot" for p in PRODUCTOS_NO_ETIQUETA]
     presentes = [c for c in fecha_cols if c in out.columns]
     ultimo_dato = out[presentes].max(axis=1)
     out["dias_desde_ultimo_dato"] = (fecha_corte - ultimo_dato).dt.days.astype("Int64")
@@ -170,9 +188,17 @@ def construir_cliente_features():
     base["cv_saldo_liquido_insuficiente"] = (
         base["cv_saldo_liquido_insuficiente"].fillna(1).astype(int))
 
-    # D8: antigüedad de la relación = meses entre FECHA_CORTE global y el
-    # primer registro del cliente en cualquier fuente (contra FECHA_CORTE
-    # explícitamente, no contra "el mes máximo del panel").
+    # D8 (AMENDADA por el leak-fix de
+    # .superpowers/sdd/2026-08-06-pipeline-crean-v2/leakage-investigation.md):
+    # antigüedad de la relación = meses entre FECHA_CORTE global y el primer
+    # registro del cliente en cualquier fuente NO-etiqueta (contra
+    # FECHA_CORTE explícitamente, no contra "el mes máximo del panel"). La
+    # redacción original de D8 decía "cualquier fuente" sin más; se comprobó
+    # que ese MIN incluía a Invesbot/Inversión Virtual y por tanto era una
+    # función directa de la etiqueta para ~32% de los adoptantes. La
+    # exclusión ya vive en `primer_registro_plata`
+    # (plata/transformacion.py::construir_primer_registro), esta capa solo
+    # consume su resultado.
     primer = leer_tabla_sqlite(config.PLATA_DB, "primer_registro_plata")
     primer["primer_mes"] = pd.to_datetime(primer["primer_mes"])
     primer["antiguedad_relacion_meses"] = (

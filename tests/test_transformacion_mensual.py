@@ -64,7 +64,11 @@ def test_saldos_mensual_aplica_forward_fill_por_cliente_producto(tmp_path, monke
     assert r["mes"].max() == pd.Timestamp("2026-02-01")   # ninguna fuente pasa del corte global
 
 
-def test_primer_registro_toma_el_minimo_entre_todas_las_fuentes(tmp_path, monkeypatch):
+def test_primer_registro_toma_el_minimo_entre_las_fuentes_no_etiqueta(tmp_path, monkeypatch):
+    """`_bronce_minimo` no coloca a Invesbot como el mínimo real para ningún
+    cliente, así que este caso no distingue "todas las fuentes" de "solo las
+    no-etiqueta" -- ver test_primer_registro_excluye_productos_de_etiqueta
+    para el caso que sí lo hace."""
     bronce_db = tmp_path / "bronce.db"
     plata_db = tmp_path / "plata.db"
     monkeypatch.setattr(config, "BRONCE_DB", bronce_db)
@@ -75,6 +79,51 @@ def test_primer_registro_toma_el_minimo_entre_todas_las_fuentes(tmp_path, monkey
     r = leer_tabla_sqlite(plata_db, "primer_registro_plata").set_index("numero_id")
     assert pd.Timestamp(r.loc[1, "primer_mes"]) == pd.Timestamp("2026-01-01")
     assert pd.Timestamp(r.loc[2, "primer_mes"]) == pd.Timestamp("2026-02-01")
+
+
+def test_primer_registro_excluye_productos_de_etiqueta(tmp_path, monkeypatch):
+    """D8 amendment (ver leakage-investigation.md, 2026-08-06): 'primer
+    registro del cliente en CUALQUIER fuente' se redefine a 'cualquier fuente
+    NO-etiqueta' (config.PRODUCTOS_ETIQUETA). Antes de este fix, el registro
+    más antiguo de un cliente en Invesbot/Inversión Virtual determinaba
+    `primer_mes` para ~32% de los adoptantes, convirtiendo
+    `antiguedad_relacion_meses` en un proxy directo de `etiqueta_adopcion`."""
+    bronce_db = tmp_path / "bronce.db"
+    plata_db = tmp_path / "plata.db"
+    monkeypatch.setattr(config, "BRONCE_DB", bronce_db)
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+
+    # numero_id=1: Invesbot (etiqueta) es la fuente GLOBALMENTE más antigua
+    # (2026-01-01) pero debe ser ignorada; cuenta_ahorro (no-etiqueta) empieza
+    # después (2026-03-01) y debe ser la que determine primer_mes.
+    escribir_tabla_sqlite(
+        pd.DataFrame({"fecha": ["2026-01-01"], "numero_id": [1],
+                      "producto": ["INVESBOT"], "saldo": [500.0]}),
+        bronce_db, "invesbot")
+    escribir_tabla_sqlite(
+        pd.DataFrame({"fecha": ["2026-03-01"], "numero_id": [1],
+                      "producto": ["CUENTA DE AHORRO"], "saldo": [100.0]}),
+        bronce_db, "crean_aho_cte")
+    escribir_tabla_sqlite(
+        pd.DataFrame(columns=["fecha", "numero_id", "producto", "saldo"]),
+        bronce_db, "crean_bolsillos")
+    escribir_tabla_sqlite(
+        pd.DataFrame(columns=["fecha", "numero_id", "producto", "saldo"]),
+        bronce_db, "crean_fiducuenta")
+    # numero_id=2: SOLO tiene dato en Inversión Virtual (etiqueta). Sin
+    # ninguna fuente no-etiqueta, el cliente no debe aparecer en absoluto en
+    # el resultado -- no hay señal de antigüedad no-etiqueta para él (mismo
+    # edge case que `sin_dato_reciente` en la capa oro).
+    escribir_tabla_sqlite(
+        pd.DataFrame({"fecha": ["2026-02-01"], "numero_id": [2],
+                      "producto": ["INVERSION_VIRTUAL"], "saldo": [300.0]}),
+        bronce_db, "crean_inv_virtual_cdt")
+
+    construir_primer_registro()
+    r = leer_tabla_sqlite(plata_db, "primer_registro_plata").set_index("numero_id")
+
+    assert pd.Timestamp(r.loc[1, "primer_mes"]) == pd.Timestamp("2026-03-01")
+    assert 2 not in r.index
 
 
 def _bronce_con_fila_intrames_posterior_al_corte(bronce_db):
