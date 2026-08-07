@@ -129,3 +129,24 @@ def test_guard_atrapa_fuga_explicita_aunque_el_filtro_sistematico_falle(monkeypa
     monkeypatch.setattr(fm, "COLUMNAS_FUGA_EXPLICITAS", frozenset())
     with pytest.raises(FugaDeInformacionError):
         fm.features_modelo_a(["n_productos_total", "ingresos_mensuales"])
+
+
+def test_modelo_a_excluye_las_columnas_de_fact_cliente_score():
+    """Un notebook que hace merge de fact_cliente_score sobre cliente_features
+    (p.ej. 07_auditoria_sesgo) no debe arrastrar sus columnas al set de
+    predictoras. `nivel` y `poblacion` son strings y rompen el fit; `score` es
+    la SALIDA del modelo de propensión y se colaría en silencio como entrada.
+    Los nombres del plan (`score_propension`/`nivel_prioridad`) no coinciden con
+    los que Task 18 escribió realmente (`score`/`nivel`), que es cómo se escapó."""
+    columnas_merge = COLUMNAS_TIPICAS + [
+        "score", "nivel", "poblacion", "modelo_usado",
+        "valor_referencia", "tipo_valor_referencia",
+        "valor_esperado_12m", "capacidad_ahorro_anualizada",
+    ]
+    feats = features_modelo_a(columnas_merge)
+    for col in ["score", "nivel", "poblacion", "modelo_usado",
+                "valor_referencia", "tipo_valor_referencia",
+                "valor_esperado_12m", "capacidad_ahorro_anualizada"]:
+        assert col not in feats, f"{col} no puede ser predictora"
+    # las legítimas siguen entrando
+    assert "ingresos_mensuales" in feats

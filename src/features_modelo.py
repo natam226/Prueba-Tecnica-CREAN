@@ -29,6 +29,21 @@ COLUMNAS_NO_FEATURE = frozenset({
     "monto_conservador_12m",
     "monto_base_12m",
     "monto_optimista_12m",
+    # Nombres REALES de las columnas de fact_cliente_score (Task 18). El plan
+    # las había anticipado como `score_propension` / `nivel_prioridad`, pero la
+    # tabla se escribió con `score` / `nivel`, así que los nombres de arriba no
+    # las atrapaban. Cualquier notebook que haga merge de fact_cliente_score
+    # sobre cliente_features (p.ej. 07_auditoria_sesgo) las arrastraría al set
+    # de predictoras: `nivel`/`poblacion` rompen el fit por ser strings, y
+    # `score` -- que es la SALIDA del modelo de propensión -- se colaría en
+    # silencio como entrada, inflando cualquier AUC medido sobre ella.
+    "score",
+    "nivel",
+    "poblacion",
+    "valor_referencia",
+    "tipo_valor_referencia",
+    "valor_esperado_12m",
+    "capacidad_ahorro_anualizada",
 })
 
 # SPEC_V2 §6.4: de las tres demográficas, SOLO género queda fuera del modelo.
