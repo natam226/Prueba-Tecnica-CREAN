@@ -6,7 +6,6 @@ Un `inf` en una feature envenena cualquier modelo lineal y distorsiona los
 percentiles de los modelos de árbol; un NaN es información honesta ("no se puede
 calcular") que HistGradientBoosting maneja nativamente.
 """
-import numpy as np
 import pandas as pd
 
 import config
@@ -147,7 +146,21 @@ def resumen_cv_saldo_liquido(panel_mensual: pd.DataFrame, productos_liquidos=Non
     meses_ventana = meses_ventana or config.VENTANA_MESES_AGREGACION
     meses_minimos = meses_minimos or config.MESES_MINIMOS_CV_LIQUIDO
     fecha_corte = pd.Timestamp(fecha_corte)
-    ventana_ini = fecha_corte - pd.DateOffset(months=meses_ventana)
+    # `panel_mensual["mes"]` son siempre día 1 (ver src/panel_mensual.py), pero
+    # `fecha_corte` es la fecha de corte GLOBAL cruda (src/fecha_corte.py:
+    # min(max_fecha) de 5 fuentes reales) y NO tiene por qué caer en día 1.
+    # Por eso el límite inferior se calcula sobre el MES de fecha_corte
+    # (`mes_corte`, día 1), no sobre `fecha_corte` tal cual: restar
+    # DateOffset directamente a una fecha con día > 1 dejaría fuera el cubo
+    # mensual más antiguo (su día 1 sería menor que el límite con día > 1) y
+    # la ventana quedaría en meses_ventana - 1 cubos, no meses_ventana.
+    # Con `mes_corte` (día 1) como ancla, "- (meses_ventana - 1)" meses
+    # produce, junto con el límite superior inclusive, exactamente
+    # `meses_ventana` cubos mensuales distintos sin importar el día de
+    # `fecha_corte`. (Con "- meses_ventana", sin el -1, el intervalo cerrado
+    # abarcaría meses_ventana + 1 cubos: uno de más.)
+    mes_corte = fecha_corte.replace(day=1)
+    ventana_ini = mes_corte - pd.DateOffset(months=meses_ventana - 1)
 
     liquidos = panel_mensual[
         panel_mensual["producto"].isin(productos_liquidos)
@@ -171,10 +184,9 @@ def resumen_cv_saldo_liquido(panel_mensual: pd.DataFrame, productos_liquidos=Non
 
     stats["cv_saldo_liquido_insuficiente"] = (
         stats["n_meses_observados"] < meses_minimos).astype(int)
-    media_valida = stats["media"] > 0
-    stats["cv_saldo_liquido"] = np.where(
-        (stats["cv_saldo_liquido_insuficiente"] == 0) & media_valida,
-        stats["std"] / stats["media"],
-        np.nan,
-    )
+    # division_segura(..., denominador_positivo=True) ya cubre media <= 0 sin
+    # evaluar ambas ramas de golpe (evita el RuntimeWarning de numpy que
+    # producía dividir por una media <= 0 dentro de np.where).
+    cv = division_segura(stats["std"], stats["media"], denominador_positivo=True)
+    stats["cv_saldo_liquido"] = cv.where(stats["cv_saldo_liquido_insuficiente"] == 0)
     return stats[["numero_id", "cv_saldo_liquido", "cv_saldo_liquido_insuficiente"]]

@@ -156,17 +156,24 @@ PRODUCTOS_LIQUIDOS_TEST = ["cuenta_ahorro", "cuenta_corriente", "bolsillos"]
 
 def test_cv_saldo_liquido_coeficiente_de_variacion_sobre_ventana_fija():
     """D9: ventana fija de 6M desde fecha_corte, coeficiente de variación
-    (std poblacional / media), no desviación absoluta."""
+    (std poblacional / media), no desviación absoluta.
+
+    La ventana con fecha_corte=2026-06-01 y meses_ventana=6 es
+    [2026-01-01, 2026-06-01] (Ene-Jun, ambos extremos inclusive = 6 cubos
+    mensuales), así que las 6 filas del fixture están todas dentro."""
     panel = pd.DataFrame({
         "numero_id": [1] * 6,
         "producto": ["cuenta_ahorro"] * 6,
-        "mes": pd.date_range("2025-12-01", periods=6, freq="MS"),
+        "mes": pd.date_range("2026-01-01", periods=6, freq="MS"),
         "saldo_mes": [100.0, 100.0, 200.0, 200.0, 300.0, 300.0],
         "observado": [1, 0, 1, 0, 1, 0],   # 3 meses observados, cumple el mínimo
     })
     r = resumen_cv_saldo_liquido(
         panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=FECHA_CORTE_TEST).set_index("numero_id")
-    # media=200, std poblacional=sqrt(40000/6)=81.6497 -> cv=0.4082
+    # media=(100+100+200+200+300+300)/6=200
+    # std poblacional=sqrt(((-100)^2*2+0^2*2+100^2*2)/6)=sqrt(40000/6)=81.649658
+    # cv=81.649658/200=0.408248 (verificado independientemente por cálculo,
+    # no leyendo el resultado de la implementación)
     assert r.loc[1, "cv_saldo_liquido"] == pytest.approx(0.408248, rel=1e-4)
     assert r.loc[1, "cv_saldo_liquido_insuficiente"] == 0
 
@@ -177,7 +184,7 @@ def test_cv_saldo_liquido_nulo_si_menos_del_minimo_de_meses_observados():
     panel = pd.DataFrame({
         "numero_id": [2] * 6,
         "producto": ["cuenta_ahorro"] * 6,
-        "mes": pd.date_range("2025-12-01", periods=6, freq="MS"),
+        "mes": pd.date_range("2026-01-01", periods=6, freq="MS"),  # Ene-Jun, dentro de la ventana
         "saldo_mes": [50.0] * 4 + [80.0, 80.0],
         "observado": [1, 0, 0, 0, 1, 0],   # solo 2 meses observados
     })
@@ -203,17 +210,24 @@ def test_cv_saldo_liquido_nulo_si_media_no_es_positiva():
 
 
 def test_cv_saldo_liquido_ignora_meses_fuera_de_la_ventana_de_6m():
-    """La ventana es FIJA de 6 meses desde fecha_corte: un mes anterior a la
-    ventana no debe influir en la media/std aunque esté en el panel."""
+    """La ventana es FIJA de 6 meses [fecha_corte - 5 meses, fecha_corte]
+    (Ene-Jun 2026 para fecha_corte=2026-06-01): un mes anterior a la ventana
+    no debe influir en la media/std aunque esté en el panel. Si el valor de
+    hace 17 meses (999999) se colara, la media/std ya no serían 0."""
     panel = pd.DataFrame({
-        "numero_id": [4] * 4,
-        "producto": ["bolsillos"] * 4,
-        "mes": pd.to_datetime(["2025-01-01", "2025-12-01", "2026-03-01", "2026-06-01"]),
-        "saldo_mes": [999999.0, 100.0, 100.0, 100.0],   # el primer valor es de hace 17 meses
-        "observado": [1, 1, 1, 1],
+        "numero_id": [4] * 7,
+        "producto": ["bolsillos"] * 7,
+        "mes": pd.to_datetime([
+            "2025-01-01",  # fuera de la ventana (17 meses antes de fecha_corte)
+            "2026-01-01", "2026-02-01", "2026-03-01",
+            "2026-04-01", "2026-05-01", "2026-06-01",
+        ]),
+        "saldo_mes": [999999.0] + [100.0] * 6,
+        "observado": [1] * 7,
     })
     r = resumen_cv_saldo_liquido(
         panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=FECHA_CORTE_TEST).set_index("numero_id")
+    # dentro de la ventana los 6 meses valen 100 parejo -> media=100, std=0
     assert r.loc[4, "cv_saldo_liquido"] == pytest.approx(0.0)   # saldo plano DENTRO de la ventana
 
 
@@ -227,3 +241,74 @@ def test_cv_saldo_liquido_ignora_productos_no_liquidos():
     })
     r = resumen_cv_saldo_liquido(panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=FECHA_CORTE_TEST)
     assert len(r) == 0
+
+
+def test_cv_saldo_liquido_ventana_contiene_exactamente_seis_meses():
+    """Ancla el tamaño de la ventana en 6 meses exactos (ni 5 ni 7): un
+    fixture con dato real en 8 meses consecutivos (Nov 2025-Jun 2026), donde
+    solo Ene-Jun 2026 deberían caer dentro de [fecha_corte - 5m, fecha_corte].
+
+    Se prueba el límite exacto pasando `meses_minimos` explícito a ambos
+    lados del conteo real de meses en ventana (6):
+      - meses_minimos=6 -> los 6 meses en ventana SÍ alcanzan -> suficiente.
+      - meses_minimos=7 -> los mismos 6 meses YA NO alcanzan -> insuficiente.
+    Si la ventana tuviera 7 cubos (el bug original) el segundo caso pasaría
+    a "suficiente" y el test fallaría, delatando el drift de +-1 mes.
+
+    Los saldos son una progresión aritmética (10..80, paso 10) para que,
+    además, el promedio de la ventana ancle CUÁLES 6 meses quedaron
+    incluidos: Ene-Jun da media 55; Dic-May (un mes corrido) daría media 45;
+    Nov-Jun con 7 meses (el bug) daría media 50 -- ninguno de esos otros
+    valores pasaría la comparación con pytest.approx de abajo.
+    """
+    panel = pd.DataFrame({
+        "numero_id": [5] * 8,
+        "producto": ["cuenta_ahorro"] * 8,
+        "mes": pd.date_range("2025-11-01", periods=8, freq="MS"),
+        "saldo_mes": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
+        "observado": [1] * 8,
+    })
+    r6 = resumen_cv_saldo_liquido(
+        panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=FECHA_CORTE_TEST,
+        meses_minimos=6).set_index("numero_id")
+    assert r6.loc[5, "cv_saldo_liquido_insuficiente"] == 0
+    # ventana = [30, 40, 50, 60, 70, 80] (Ene-Jun): media=55,
+    # std poblacional=sqrt(1750/6)=17.078251 -> cv=17.078251/55=0.310514
+    # (verificado independientemente por cálculo)
+    assert r6.loc[5, "cv_saldo_liquido"] == pytest.approx(0.310514, rel=1e-4)
+
+    r7 = resumen_cv_saldo_liquido(
+        panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=FECHA_CORTE_TEST,
+        meses_minimos=7).set_index("numero_id")
+    assert r7.loc[5, "cv_saldo_liquido_insuficiente"] == 1
+    assert pd.isna(r7.loc[5, "cv_saldo_liquido"])
+
+
+def test_cv_saldo_liquido_ventana_no_depende_del_dia_de_fecha_corte():
+    """`fecha_corte` en producción (src/fecha_corte.calcular_fecha_corte)
+    es un min(max_fecha) de datos reales -- NO tiene por qué caer en día 1.
+    `panel_mensual["mes"]` sí es siempre día 1 (src/panel_mensual.py). Con
+    un fecha_corte de mitad de mes (17), la ventana debe seguir cubriendo
+    exactamente los mismos 6 cubos mensuales que con un fecha_corte de
+    día 1 en el mismo mes -- restar DateOffset directamente sobre un
+    fecha_corte con día > 1 dejaría fuera el cubo más antiguo, igual que el
+    bug original dejaba fuera un cubo por el otro extremo."""
+    panel = pd.DataFrame({
+        "numero_id": [5] * 8,
+        "producto": ["cuenta_ahorro"] * 8,
+        "mes": pd.date_range("2025-11-01", periods=8, freq="MS"),
+        "saldo_mes": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
+        "observado": [1] * 8,
+    })
+    fecha_corte_mitad_de_mes = pd.Timestamp("2026-06-17")
+    r6 = resumen_cv_saldo_liquido(
+        panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=fecha_corte_mitad_de_mes,
+        meses_minimos=6).set_index("numero_id")
+    assert r6.loc[5, "cv_saldo_liquido_insuficiente"] == 0
+    # mismos 6 cubos que con fecha_corte=2026-06-01 (Ene-Jun) -> mismo cv
+    assert r6.loc[5, "cv_saldo_liquido"] == pytest.approx(0.310514, rel=1e-4)
+
+    r7 = resumen_cv_saldo_liquido(
+        panel, PRODUCTOS_LIQUIDOS_TEST, fecha_corte=fecha_corte_mitad_de_mes,
+        meses_minimos=7).set_index("numero_id")
+    assert r7.loc[5, "cv_saldo_liquido_insuficiente"] == 1
