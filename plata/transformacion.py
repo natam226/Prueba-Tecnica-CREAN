@@ -2,6 +2,17 @@
 import config
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
 from src.aggregations import agregar_serie_saldo, normalizar_producto_inv_virtual
+from src.fecha_corte import calcular_fecha_corte
+
+FECHA_CORTE = None  # se resuelve en tiempo de ejecución, ver _fecha_corte()
+
+
+def _fecha_corte():
+    global FECHA_CORTE
+    if FECHA_CORTE is None:
+        FECHA_CORTE = calcular_fecha_corte()
+    return FECHA_CORTE
+
 
 COLS_FINANCIERAS = ["ingresos_mensuales", "total_egresos_mensuales", "total_activos", "total_pasivos", "total_patrimonio"]
 
@@ -36,7 +47,9 @@ def transformar_aho_cte():
     df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].map(MAPA_PRODUCTO_SLUG)
     assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
-    resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
+    resultado = agregar_serie_saldo(
+        df, group_cols=["numero_id", "producto"], fecha_corte=_fecha_corte(),
+        meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, "aho_cte_plata")
     return resultado
 
@@ -45,7 +58,9 @@ def transformar_producto_unico(tabla_bronce, tabla_plata_destino):
     df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].map(MAPA_PRODUCTO_SLUG)
     assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
-    resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
+    resultado = agregar_serie_saldo(
+        df, group_cols=["numero_id", "producto"], fecha_corte=_fecha_corte(),
+        meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, tabla_plata_destino)
     return resultado
 
@@ -55,7 +70,9 @@ def transformar_cdt_inversion_virtual():
     df = leer_tabla_sqlite(config.BRONCE_DB, tabla_bronce)
     df["producto"] = df["producto"].apply(normalizar_producto_inv_virtual).map(MAPA_PRODUCTO_SLUG)
     assert df["producto"].notna().all(), f"valores de producto sin mapear en {tabla_bronce}"
-    resultado = agregar_serie_saldo(df, group_cols=["numero_id", "producto"], meses_ventana=config.VENTANA_MESES_AGREGACION)
+    resultado = agregar_serie_saldo(
+        df, group_cols=["numero_id", "producto"], fecha_corte=_fecha_corte(),
+        meses_ventana=config.VENTANA_MESES_AGREGACION)
     escribir_tabla_sqlite(resultado, config.PLATA_DB, "cdt_inversion_virtual_plata")
     return resultado
 

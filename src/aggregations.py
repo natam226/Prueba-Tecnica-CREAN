@@ -1,10 +1,18 @@
 import pandas as pd
 
 
-def agregar_serie_saldo(df, group_cols, fecha_col="fecha", saldo_col="saldo", meses_ventana=6):
+def agregar_serie_saldo(df, group_cols, fecha_corte, fecha_col="fecha", saldo_col="saldo", meses_ventana=6):
+    """Snapshot / promedio 6M / tendencia 6M contra una fecha de corte GLOBAL (D4).
+
+    `fecha_corte` ya no se infiere de `df[fecha_col].max()` (eso mediría cada
+    fuente, o peor, cada grupo, en un momento distinto). Se recibe siempre como
+    parámetro externo — típicamente `src.fecha_corte.calcular_fecha_corte()` —
+    para que TODA la base quede medida contra la misma referencia temporal.
+    """
     df = df.copy()
     df[fecha_col] = pd.to_datetime(df[fecha_col])
-    fecha_corte = df[fecha_col].max()
+    fecha_corte = pd.Timestamp(fecha_corte)
+    df = df[df[fecha_col] <= fecha_corte]   # D4: se descarta lo posterior al corte
     ventana_ini = fecha_corte - pd.DateOffset(months=meses_ventana)
     mitad = fecha_corte - pd.DateOffset(months=meses_ventana // 2)
 
