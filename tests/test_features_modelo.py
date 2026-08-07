@@ -19,6 +19,16 @@ COLUMNAS_TIPICAS = [
     "n_productos_inversion_no_etiqueta", "saldo_invertido_no_etiqueta",
     "invesbot_saldo_snapshot", "inversion_virtual_tendencia_6m",
     "desc_genero", "grupo_edad", "desc_tipo_de_vivienda", "desc_segmento",
+    # Task 2B: `_pivotear_producto` dejó de eliminar `fecha_snapshot` para poder
+    # derivar `dias_desde_ultimo_dato`, así que estas columnas datetime-string
+    # SÍ existen en la tabla real y el fixture debe reflejarlo (ver bug de
+    # integración detectado en Task 5: HistGradientBoostingClassifier no puede
+    # entrenar con un string de fecha).
+    "cdt_fecha_snapshot", "fiducuenta_fecha_snapshot",
+    "cuenta_ahorro_fecha_snapshot", "cuenta_corriente_fecha_snapshot",
+    "bolsillos_fecha_snapshot", "invesbot_fecha_snapshot",
+    "inversion_virtual_fecha_snapshot",
+    "dias_desde_ultimo_dato",
 ]
 
 
@@ -68,6 +78,19 @@ def test_modelo_a_excluye_etiqueta_alternativa_de_sensibilidad():
     # la tabla real cliente_features (ver Task 3) y debe quedar excluida igual.
     feats = features_modelo_a(COLUMNAS_TIPICAS + ["etiqueta_adopcion_reciente"])
     assert "etiqueta_adopcion_reciente" not in feats
+
+
+def test_modelo_a_excluye_fecha_snapshot_por_producto():
+    # Task 2B dejó `{producto}_fecha_snapshot` en la tabla (datetime-string) para
+    # poder derivar `dias_desde_ultimo_dato`. No es predictora: un modelo de
+    # sklearn no puede entrenar con un string de fecha. La forma numérica
+    # (`dias_desde_ultimo_dato`) sí debe conservarse.
+    feats = features_modelo_a(COLUMNAS_TIPICAS)
+    for c in ["cdt_fecha_snapshot", "fiducuenta_fecha_snapshot",
+              "cuenta_ahorro_fecha_snapshot", "cuenta_corriente_fecha_snapshot",
+              "bolsillos_fecha_snapshot"]:
+        assert c not in feats, f"{c} es un artefacto intermedio, no una predictora"
+    assert "dias_desde_ultimo_dato" in feats
 
 
 def test_ambas_funciones_lanzan_si_se_cuela_una_columna_prohibida(monkeypatch):

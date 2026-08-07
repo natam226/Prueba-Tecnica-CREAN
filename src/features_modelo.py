@@ -36,6 +36,14 @@ COLUMNAS_SENSIBLES_EXCLUIDAS = ("desc_genero",)
 # Prefijos que el Modelo A no puede usar: los de fuga.
 PREFIJOS_EXCLUIDOS_A = PREFIJOS_FUGA
 
+# Sufijos que el Modelo A no puede usar: artefactos intermedios, no predictoras.
+# `{producto}_fecha_snapshot` es un datetime-string que Task 2B dejó de eliminar
+# en `_pivotear_producto` porque `agregar_recencia_dato` lo necesita para derivar
+# `dias_desde_ultimo_dato` (la forma numérica, esa sí predictora, ya está en
+# COLUMNAS_MODELO_B/A). Regla por sufijo -- no por lista de nombres -- para que
+# un producto nuevo no reintroduzca el bug en silencio.
+SUFIJOS_EXCLUIDOS_A = ("_fecha_snapshot",)
+
 # Modelo B: lista blanca. Nada de producto, ni siquiera indirectamente.
 # Son las columnas financieras + sus derivadas de §5 que no tocan saldos de producto.
 COLUMNAS_MODELO_B = tuple(config.COLS_FINANCIERAS) + (
@@ -65,6 +73,7 @@ def features_modelo_a(columnas: Iterable[str]) -> list[str]:
         if c not in COLUMNAS_NO_FEATURE
         and c not in COLUMNAS_SENSIBLES_EXCLUIDAS
         and not c.startswith(PREFIJOS_EXCLUIDOS_A)
+        and not c.endswith(SUFIJOS_EXCLUIDOS_A)
     ]
     validar_sin_fuga(feats, contexto="Modelo A")
     return feats
