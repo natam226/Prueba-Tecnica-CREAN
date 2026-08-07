@@ -14,7 +14,7 @@ def _fecha_corte():
     return FECHA_CORTE
 
 
-COLS_FINANCIERAS = ["ingresos_mensuales", "total_egresos_mensuales", "total_activos", "total_pasivos", "total_patrimonio"]
+COLS_FINANCIERAS = config.COLS_FINANCIERAS
 
 MAPA_PRODUCTO_SLUG = {
     "CUENTA DE AHORRO": "cuenta_ahorro",
@@ -36,7 +36,10 @@ FUENTES_PRODUCTO_UNICO = [
 def limpiar_clientes():
     df = leer_tabla_sqlite(config.BRONCE_DB, "clientes")
     df = df.drop_duplicates(subset="numero_id", keep="first")
+    # `any`: bandera descriptiva conservadora (Pregunta Abierta #3)
     df["sin_dato_financiero"] = df[COLS_FINANCIERAS].isnull().any(axis=1)
+    # `all`: "ninguna señal financiera", único insumo válido para la exclusión de SPEC_V2 §2
+    df["sin_dato_financiero_total"] = df[COLS_FINANCIERAS].isnull().all(axis=1)
     df["capacidad_ahorro"] = df["ingresos_mensuales"] - df["total_egresos_mensuales"]
     escribir_tabla_sqlite(df, config.PLATA_DB, "clientes_plata")
     return df

@@ -22,13 +22,12 @@ def _tabla_producto(numero_id, producto, saldo_snapshot=100.0, saldo_prom_6m=100
 
 def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
     """
-    Cubre las dos reglas de negocio más consecuentes de todo el pipeline:
-    etiqueta_adopcion y excluir_modelado. Clientes sintéticos:
+    Cubre las dos reglas de negocio más consecuentes: etiqueta_adopcion y las
+    banderas de población de SPEC_V2 §2. Clientes sintéticos:
       - 201: saldo positivo en invesbot -> etiqueta_adopcion == 1
-      - 202: saldo positivo solo en CDT (no invesbot/inversion_virtual)
-             -> etiqueta_adopcion == 0 (CDT/Fiducuenta son señal, no parte de la etiqueta)
-      - 203: sin tenencia en ningún producto y sin estimador_ingreso -> excluir_modelado == 1
-      - 204: sin tenencia en ningún producto pero CON estimador_ingreso -> excluir_modelado == 0
+      - 202: saldo positivo solo en CDT -> etiqueta_adopcion == 0
+      - 203: sin producto, sin estimador, sin financieros -> apto_entrenamiento == 0
+      - 204: sin producto pero CON estimador -> apto_entrenamiento == 1
     """
     plata_db = tmp_path / "plata.db"
     oro_db = tmp_path / "oro.db"
@@ -38,59 +37,86 @@ def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
         "oro.construir_cliente_features.calcular_fecha_corte",
         lambda: pd.Timestamp("2026-06-01"))
 
-    clientes_plata = pd.DataFrame({"numero_id": [201, 202, 203, 204]})
+    clientes_plata = pd.DataFrame({
+        "numero_id": [201, 202, 203, 204],
+        "sin_dato_financiero_total": [False, False, True, True],
+    })
     escribir_tabla_sqlite(clientes_plata, plata_db, "clientes_plata")
 
-    # aho_cte_plata: ninguno de nuestros clientes sintéticos tiene cuenta_ahorro/corriente
+    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
+                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    escribir_tabla_sqlite(vacia, plata_db, "aho_cte_plata")
+    escribir_tabla_sqlite(vacia, plata_db, "bolsillos_plata")
+    escribir_tabla_sqlite(vacia, plata_db, "fiducuenta_plata")
+
     escribir_tabla_sqlite(
-        pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                               "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"]),
-        plata_db, "aho_cte_plata",
+        pd.DataFrame([_tabla_producto(202, "cdt", saldo_snapshot=1000.0)]),
+        plata_db, "cdt_inversion_virtual_plata",
     )
     escribir_tabla_sqlite(
-        pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                               "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"]),
-        plata_db, "bolsillos_plata",
+        pd.DataFrame([_tabla_producto(201, "invesbot", saldo_snapshot=500.0)]),
+        plata_db, "invesbot_plata",
     )
     escribir_tabla_sqlite(
-        pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                               "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"]),
-        plata_db, "fiducuenta_plata",
+        pd.DataFrame({"numero_id": [204], "estimador_ingreso": [3_000_000.0],
+                      "tiene_estimador_ingreso": [True]}),
+        plata_db, "estimador_ingresos_plata",
     )
 
-    # cdt_inversion_virtual_plata: 202 tiene CDT positivo (no debe activar la etiqueta)
-    cdt_inv = pd.DataFrame([_tabla_producto(202, "cdt", saldo_snapshot=1000.0)])
-    escribir_tabla_sqlite(cdt_inv, plata_db, "cdt_inversion_virtual_plata")
+    resultado = construir_cliente_features().set_index("numero_id")
 
-    # invesbot_plata: 201 tiene saldo positivo (debe activar la etiqueta)
-    invesbot = pd.DataFrame([_tabla_producto(201, "invesbot", saldo_snapshot=500.0)])
-    escribir_tabla_sqlite(invesbot, plata_db, "invesbot_plata")
-
-    # estimador_ingresos_plata: solo 204 tiene estimador de ingreso
-    estimador = pd.DataFrame({
-        "numero_id": [204],
-        "estimador_ingreso": [3_000_000.0],
-        "tiene_estimador_ingreso": [True],
-    })
-    escribir_tabla_sqlite(estimador, plata_db, "estimador_ingresos_plata")
-
-    resultado = construir_cliente_features()
-    resultado = resultado.set_index("numero_id")
-
-    # (a) saldo positivo en invesbot -> adopción
     assert resultado.loc[201, "etiqueta_adopcion"] == 1
-    # (b) saldo positivo solo en CDT -> NO adopción (CDT/Fiducuenta no son parte de la etiqueta)
     assert resultado.loc[202, "etiqueta_adopcion"] == 0
     assert resultado.loc[201, "cdt_tenencia"] == 0
     assert resultado.loc[202, "invesbot_tenencia"] == 0
-    assert resultado.loc[202, "inversion_virtual_tenencia"] == 0
 
-    # (c) sin tenencia en ningún producto y sin estimador_ingreso -> excluir del modelado
-    assert resultado.loc[203, "excluir_modelado"] == 1
-    assert resultado.loc[203, "etiqueta_adopcion"] == 0
+    # SPEC_V2 §2: excluir_modelado desaparece
+    assert "excluir_modelado" not in resultado.columns
 
-    # (d) sin tenencia en ningún producto pero con estimador_ingreso -> NO excluir
-    assert resultado.loc[204, "excluir_modelado"] == 0
+    # tiene_historial_producto: separado de la aptitud para entrenar
+    assert resultado.loc[201, "tiene_historial_producto"] == 1
+    assert resultado.loc[202, "tiene_historial_producto"] == 1
+    assert resultado.loc[203, "tiene_historial_producto"] == 0
+    assert resultado.loc[204, "tiene_historial_producto"] == 0
+
+    # única exclusión admitida: sin señal en NINGUNA fuente
+    assert resultado.loc[203, "apto_entrenamiento"] == 0
+    assert resultado.loc[203, "sin_ninguna_senal"] == 1
+    # 204 no tiene producto pero sí estimador -> entra al entrenamiento como negativo legítimo
+    assert resultado.loc[204, "apto_entrenamiento"] == 1
+    assert resultado.loc[204, "sin_ninguna_senal"] == 0
+
+
+def test_cliente_sin_producto_pero_con_datos_financieros_entra_al_entrenamiento(tmp_path, monkeypatch):
+    """SPEC_V2 §2: los ~90.467 clientes con datos financieros completos y sin
+    historial de producto son ejemplos negativos legítimos y necesarios.
+    No pueden quedar fuera del entrenamiento ni del scoring."""
+    plata_db = tmp_path / "plata.db"
+    oro_db = tmp_path / "oro.db"
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+    monkeypatch.setattr(config, "ORO_DB", oro_db)
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-06-01"))
+
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [401], "sin_dato_financiero_total": [False]}),
+        plata_db, "clientes_plata",
+    )
+    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
+                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    for t in ["aho_cte_plata", "bolsillos_plata", "fiducuenta_plata",
+              "cdt_inversion_virtual_plata", "invesbot_plata"]:
+        escribir_tabla_sqlite(vacia, plata_db, t)
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
+        plata_db, "estimador_ingresos_plata",
+    )
+
+    r = construir_cliente_features().set_index("numero_id")
+    assert r.loc[401, "tiene_historial_producto"] == 0
+    assert r.loc[401, "apto_entrenamiento"] == 1   # tiene señal financiera
+    assert r.loc[401, "sin_ninguna_senal"] == 0
 
 
 def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, monkeypatch):
@@ -105,7 +131,11 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
         "oro.construir_cliente_features.calcular_fecha_corte",
         lambda: pd.Timestamp("2026-06-01"))
 
-    escribir_tabla_sqlite(pd.DataFrame({"numero_id": [301, 302]}), plata_db, "clientes_plata")
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [301, 302],
+                      "sin_dato_financiero_total": [False, False]}),
+        plata_db, "clientes_plata",
+    )
 
     vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
                                    "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
@@ -153,7 +183,9 @@ def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
         lambda: pd.Timestamp("2026-06-01"))
 
     escribir_tabla_sqlite(
-        pd.DataFrame({"numero_id": [601, 602, 603]}), plata_db, "clientes_plata")
+        pd.DataFrame({"numero_id": [601, 602, 603],
+                      "sin_dato_financiero_total": [False, False, False]}),
+        plata_db, "clientes_plata")
 
     vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
                                    "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])

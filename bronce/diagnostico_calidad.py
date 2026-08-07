@@ -8,7 +8,7 @@ import config
 from src.db_io import leer_tabla_sqlite
 
 TABLAS_SALDO = ["crean_aho_cte", "crean_bolsillos", "crean_fiducuenta", "crean_inv_virtual_cdt", "invesbot"]
-COLS_FINANCIERAS = ["ingresos_mensuales", "total_egresos_mensuales", "total_activos", "total_pasivos", "total_patrimonio"]
+COLS_FINANCIERAS = config.COLS_FINANCIERAS
 
 
 def reporte_nulos_clientes(df):

@@ -121,10 +121,19 @@ def construir_cliente_features():
         (base[cols_saldo_no_etiqueta].fillna(0.0) > 0).sum(axis=1).astype(int)
     )
 
+    # --- SPEC_V2 §2: población de entrenamiento vs. población de scoring ---
+    # Se scorea a TODA la base. La única exclusión admitida es "sin ninguna señal
+    # en ninguna fuente": ni producto, ni estimador de ingreso, ni datos financieros.
     tenencia_cols = [f"{p}_tenencia" for p in PRODUCTOS]
-    base["excluir_modelado"] = (
-        (base[tenencia_cols].sum(axis=1) == 0) & (~base["tiene_estimador_ingreso"])
+    base["tiene_historial_producto"] = (base[tenencia_cols].sum(axis=1) > 0).astype(int)
+
+    base["sin_ninguna_senal"] = (
+        (base["tiene_historial_producto"] == 0)
+        & (~base["tiene_estimador_ingreso"])
+        & base["sin_dato_financiero_total"].fillna(False).astype(bool)
     ).astype(int)
+
+    base["apto_entrenamiento"] = (1 - base["sin_ninguna_senal"]).astype(int)
 
     escribir_tabla_sqlite(base, config.ORO_DB, "cliente_features")
     return base
@@ -134,4 +143,6 @@ if __name__ == "__main__":
     df = construir_cliente_features()
     print(f"cliente_features: {len(df)} filas, {df.shape[1]} columnas")
     print(f"tasa adopción: {df['etiqueta_adopcion'].mean():.4f}")
-    print(f"excluidos del modelado: {df['excluir_modelado'].sum()}")
+    print(f"con historial de producto: {df['tiene_historial_producto'].sum()}")
+    print(f"sin ninguna señal (única exclusión): {df['sin_ninguna_senal'].sum()}")
+    print(f"aptos para entrenamiento: {df['apto_entrenamiento'].sum()}")
