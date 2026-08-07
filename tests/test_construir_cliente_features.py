@@ -20,6 +20,47 @@ def _tabla_producto(numero_id, producto, saldo_snapshot=100.0, saldo_prom_6m=100
     }
 
 
+def _clientes_plata(ids, **overrides):
+    """Fixture de clientes_plata con TODAS las columnas que consume la capa oro.
+
+    Valores por defecto neutros: financieros completos (no dispara ninguna
+    bandera de faltante) y vivienda nula (para ejercitar el nivel "Sin dato").
+    """
+    n = len(ids)
+    datos = {
+        "numero_id": list(ids),
+        "sin_dato_financiero": [False] * n,
+        "sin_dato_financiero_total": [False] * n,
+        "desc_segmento": ["PERSONAL"] * n,
+        "grupo_edad": ["30-39"] * n,
+        "desc_genero": ["F"] * n,
+        "desc_tipo_de_vivienda": [None] * n,
+        "ingresos_mensuales": [1000.0] * n,
+        "total_egresos_mensuales": [400.0] * n,
+        "total_activos": [5000.0] * n,
+        "total_pasivos": [1000.0] * n,
+        "total_patrimonio": [4000.0] * n,
+        "capacidad_ahorro": [600.0] * n,
+    }
+    datos.update(overrides)
+    return pd.DataFrame(datos)
+
+
+def _plata_vacia_producto():
+    return pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
+                                 "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+
+
+def _panel_y_primer_registro_vacios(plata_db):
+    """saldos_mensual_plata y primer_registro_plata: insumos de volatilidad y antigüedad."""
+    escribir_tabla_sqlite(
+        pd.DataFrame(columns=["numero_id", "producto", "mes", "saldo_mes"]),
+        plata_db, "saldos_mensual_plata")
+    escribir_tabla_sqlite(
+        pd.DataFrame(columns=["numero_id", "primer_mes"]),
+        plata_db, "primer_registro_plata")
+
+
 def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
     """
     Cubre las dos reglas de negocio más consecuentes: etiqueta_adopcion y las
@@ -37,14 +78,13 @@ def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
         "oro.construir_cliente_features.calcular_fecha_corte",
         lambda: pd.Timestamp("2026-06-01"))
 
-    clientes_plata = pd.DataFrame({
-        "numero_id": [201, 202, 203, 204],
-        "sin_dato_financiero_total": [False, False, True, True],
-    })
-    escribir_tabla_sqlite(clientes_plata, plata_db, "clientes_plata")
+    escribir_tabla_sqlite(
+        _clientes_plata([201, 202, 203, 204],
+                        sin_dato_financiero_total=[False, False, True, True]),
+        plata_db, "clientes_plata",
+    )
 
-    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    vacia = _plata_vacia_producto()
     escribir_tabla_sqlite(vacia, plata_db, "aho_cte_plata")
     escribir_tabla_sqlite(vacia, plata_db, "bolsillos_plata")
     escribir_tabla_sqlite(vacia, plata_db, "fiducuenta_plata")
@@ -62,6 +102,7 @@ def test_construir_cliente_features_logica_de_negocio(tmp_path, monkeypatch):
                       "tiene_estimador_ingreso": [True]}),
         plata_db, "estimador_ingresos_plata",
     )
+    _panel_y_primer_registro_vacios(plata_db)
 
     resultado = construir_cliente_features().set_index("numero_id")
 
@@ -100,11 +141,10 @@ def test_cliente_sin_producto_pero_con_datos_financieros_entra_al_entrenamiento(
         lambda: pd.Timestamp("2026-06-01"))
 
     escribir_tabla_sqlite(
-        pd.DataFrame({"numero_id": [401], "sin_dato_financiero_total": [False]}),
+        _clientes_plata([401], sin_dato_financiero_total=[False]),
         plata_db, "clientes_plata",
     )
-    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    vacia = _plata_vacia_producto()
     for t in ["aho_cte_plata", "bolsillos_plata", "fiducuenta_plata",
               "cdt_inversion_virtual_plata", "invesbot_plata"]:
         escribir_tabla_sqlite(vacia, plata_db, t)
@@ -112,6 +152,7 @@ def test_cliente_sin_producto_pero_con_datos_financieros_entra_al_entrenamiento(
         pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
         plata_db, "estimador_ingresos_plata",
     )
+    _panel_y_primer_registro_vacios(plata_db)
 
     r = construir_cliente_features().set_index("numero_id")
     assert r.loc[401, "tiene_historial_producto"] == 0
@@ -132,13 +173,11 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
         lambda: pd.Timestamp("2026-06-01"))
 
     escribir_tabla_sqlite(
-        pd.DataFrame({"numero_id": [301, 302],
-                      "sin_dato_financiero_total": [False, False]}),
+        _clientes_plata([301, 302], sin_dato_financiero_total=[False, False]),
         plata_db, "clientes_plata",
     )
 
-    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    vacia = _plata_vacia_producto()
     escribir_tabla_sqlite(vacia, plata_db, "aho_cte_plata")
     escribir_tabla_sqlite(vacia, plata_db, "bolsillos_plata")
 
@@ -161,6 +200,7 @@ def test_agregados_de_inversion_excluyen_los_productos_de_la_etiqueta(tmp_path, 
         pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
         plata_db, "estimador_ingresos_plata",
     )
+    _panel_y_primer_registro_vacios(plata_db)
 
     r = construir_cliente_features().set_index("numero_id")
 
@@ -183,12 +223,10 @@ def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
         lambda: pd.Timestamp("2026-06-01"))
 
     escribir_tabla_sqlite(
-        pd.DataFrame({"numero_id": [601, 602, 603],
-                      "sin_dato_financiero_total": [False, False, False]}),
+        _clientes_plata([601, 602, 603], sin_dato_financiero_total=[False, False, False]),
         plata_db, "clientes_plata")
 
-    vacia = pd.DataFrame(columns=["numero_id", "producto", "saldo_snapshot", "fecha_snapshot",
-                                   "saldo_prom_6m", "tendencia_6m", "n_obs_ventana", "tenencia"])
+    vacia = _plata_vacia_producto()
     for t in ["aho_cte_plata", "bolsillos_plata", "fiducuenta_plata", "cdt_inversion_virtual_plata"]:
         escribir_tabla_sqlite(vacia, plata_db, t)
 
@@ -203,6 +241,7 @@ def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
     escribir_tabla_sqlite(
         pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
         plata_db, "estimador_ingresos_plata")
+    _panel_y_primer_registro_vacios(plata_db)
 
     r = construir_cliente_features().set_index("numero_id")
 
@@ -216,3 +255,64 @@ def test_recencia_de_dato_y_etiqueta_alternativa(tmp_path, monkeypatch):
     assert pd.isna(r.loc[603, "dias_desde_ultimo_dato"])
     assert r.loc[603, "sin_dato_reciente"] == 1
     assert r.loc[601, "sin_dato_reciente"] == 0
+
+
+def test_cliente_features_incluye_las_derivadas_de_spec_v2(tmp_path, monkeypatch):
+    """SPEC_V2 §5: las derivadas se calculan dentro de la capa oro, no en el notebook."""
+    plata_db = tmp_path / "plata.db"
+    oro_db = tmp_path / "oro.db"
+    monkeypatch.setattr(config, "PLATA_DB", plata_db)
+    monkeypatch.setattr(config, "ORO_DB", oro_db)
+
+    escribir_tabla_sqlite(pd.DataFrame({
+        "numero_id": [501],
+        "sin_dato_financiero_total": [False],
+        "desc_tipo_de_vivienda": [None],
+        "ingresos_mensuales": [1000.0],
+        "total_egresos_mensuales": [400.0],
+        "total_activos": [5000.0],
+        "total_pasivos": [1000.0],
+        "total_patrimonio": [4000.0],
+        "capacidad_ahorro": [600.0],
+    }), plata_db, "clientes_plata")
+
+    vacia = _plata_vacia_producto()
+    escribir_tabla_sqlite(pd.DataFrame([_tabla_producto(501, "cuenta_ahorro", saldo_snapshot=300.0)]),
+                          plata_db, "aho_cte_plata")
+    for t in ["bolsillos_plata", "fiducuenta_plata", "cdt_inversion_virtual_plata", "invesbot_plata"]:
+        escribir_tabla_sqlite(vacia, plata_db, t)
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [], "estimador_ingreso": [], "tiene_estimador_ingreso": []}),
+        plata_db, "estimador_ingresos_plata")
+    escribir_tabla_sqlite(pd.DataFrame({
+        "numero_id": [501, 501, 501],
+        "producto": ["cuenta_ahorro"] * 3,
+        "mes": ["2026-01-01", "2026-02-01", "2026-03-01"],
+        "saldo_mes": [100.0, 200.0, 300.0],
+        "observado": [1, 1, 1],
+    }), plata_db, "saldos_mensual_plata")
+    escribir_tabla_sqlite(
+        pd.DataFrame({"numero_id": [501], "primer_mes": ["2026-01-01"]}),
+        plata_db, "primer_registro_plata")
+
+    # FECHA_CORTE se calcula desde bronce.db (Task 0B): el fixture de esta
+    # tarea no escribe bronce, así que se monkeypatchea directamente.
+    monkeypatch.setattr(
+        "oro.construir_cliente_features.calcular_fecha_corte",
+        lambda: pd.Timestamp("2026-03-01"))
+
+    r = construir_cliente_features().set_index("numero_id")
+
+    assert r.loc[501, "ratio_egreso_ingreso"] == 0.4
+    assert r.loc[501, "saldo_liquido_total"] == 300.0
+    assert r.loc[501, "n_productos_no_etiqueta"] == 1
+    assert r.loc[501, "desc_tipo_de_vivienda"] == "Sin dato"
+    assert r.loc[501, "tiene_dato_vivienda"] == 0
+    assert r.loc[501, "falta_estimador"] == 1
+    assert r.loc[501, "falta_financiero"] == 0
+    # media=200, std poblacional=sqrt(20000/3)=81.6497 -> cv=0.4082 (D9)
+    assert abs(r.loc[501, "cv_saldo_liquido"] - 0.408248) < 1e-4
+    assert r.loc[501, "cv_saldo_liquido_insuficiente"] == 0
+    assert r.loc[501, "antiguedad_relacion_meses"] == 2   # ene -> mar (FECHA_CORTE, D8)
+    assert r.loc[501, "cuenta_ahorro_tendencia_relativa_6m"] == (
+        r.loc[501, "cuenta_ahorro_tendencia_6m"] / r.loc[501, "cuenta_ahorro_saldo_prom_6m"])

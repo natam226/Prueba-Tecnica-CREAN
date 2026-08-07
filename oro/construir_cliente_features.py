@@ -3,6 +3,14 @@ import pandas as pd
 
 import config
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
+from src.derivadas import (
+    agregar_agregados_producto,
+    agregar_banderas_faltantes,
+    agregar_ratios_financieros,
+    agregar_tendencia_relativa,
+    agregar_vivienda_como_categoria,
+    resumen_cv_saldo_liquido,
+)
 from src.fecha_corte import calcular_fecha_corte
 
 PRODUCTOS = config.PRODUCTOS
@@ -134,6 +142,45 @@ def construir_cliente_features():
     ).astype(int)
 
     base["apto_entrenamiento"] = (1 - base["sin_ninguna_senal"]).astype(int)
+
+    # --- SPEC_V2 §5: variables derivadas ---
+    base = agregar_ratios_financieros(base)
+    base = agregar_agregados_producto(base)
+    base = agregar_tendencia_relativa(base)   # D3: {producto}_tendencia_relativa_6m
+    base = agregar_vivienda_como_categoria(base)
+    base = agregar_banderas_faltantes(base, {
+        "financiero": config.COLS_FINANCIERAS,
+        "estimador": ["estimador_ingreso"],
+    })
+    # `falta_vivienda` NO sale de agregar_banderas_faltantes: `agregar_vivienda_como_categoria`
+    # ya sustituyó los nulos por "Sin dato", así que la columna no tiene nulos que contar.
+    # Es el complemento exacto de la bandera que esa función dejó.
+    base["falta_vivienda"] = (1 - base["tiene_dato_vivienda"]).astype(int)
+
+    # D9: coeficiente de variación del saldo líquido, ventana fija de 6M desde
+    # FECHA_CORTE (misma `fecha_corte` global ya calculada arriba), mínimo de
+    # meses observados (Task 7 ya regulariza todas las fuentes contra ese
+    # mismo mes_max).
+    panel = leer_tabla_sqlite(config.PLATA_DB, "saldos_mensual_plata")
+    panel["mes"] = pd.to_datetime(panel["mes"])
+    base = base.merge(
+        resumen_cv_saldo_liquido(panel, config.PRODUCTOS_LIQUIDOS, fecha_corte=fecha_corte),
+        on="numero_id", how="left",
+    )
+    base["cv_saldo_liquido_insuficiente"] = (
+        base["cv_saldo_liquido_insuficiente"].fillna(1).astype(int))
+
+    # D8: antigüedad de la relación = meses entre FECHA_CORTE global y el
+    # primer registro del cliente en cualquier fuente (contra FECHA_CORTE
+    # explícitamente, no contra "el mes máximo del panel").
+    primer = leer_tabla_sqlite(config.PLATA_DB, "primer_registro_plata")
+    primer["primer_mes"] = pd.to_datetime(primer["primer_mes"])
+    primer["antiguedad_relacion_meses"] = (
+        (fecha_corte.year - primer["primer_mes"].dt.year) * 12
+        + (fecha_corte.month - primer["primer_mes"].dt.month)
+    ).astype("Int64")
+    base = base.merge(
+        primer[["numero_id", "antiguedad_relacion_meses"]], on="numero_id", how="left")
 
     escribir_tabla_sqlite(base, config.ORO_DB, "cliente_features")
     return base
