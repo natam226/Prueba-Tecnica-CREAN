@@ -103,8 +103,8 @@ solo el código que las produce.
 
 ## Resultados actuales (medidos, con su contexto — no citar sin él)
 
-- **Modelo de propensión a adopción**: AUC Modelo A = **0.8942**, Modelo B
-  (cold-start, solo capacidad financiera) = **0.8375**, sobre 860,223 clientes
+- **Modelo de propensión a adopción**: AUC Modelo A = **0.8933**, Modelo B
+  (cold-start, solo capacidad financiera) = **0.8338**, sobre 860,223 clientes
   escoreados (0 sin score). Esta es la cifra **posterior** a corregir una fuga
   de etiqueta: `dias_desde_ultimo_dato`, `sin_dato_reciente` y
   `antiguedad_relacion_meses` se calculaban originalmente sobre las 7 fuentes
@@ -113,7 +113,7 @@ solo el código que las produce.
   qué versión del feature set se usara — ambas por encima, o peligrosamente
   cerca, del umbral de sospecha de fuga (`UMBRAL_AUC_FUGA = 0.95`). Al
   redefinir esas tres variables sobre las 5 fuentes no-etiqueta el AUC bajó a
-  0.8942, estadísticamente idéntico a simplemente eliminarlas (0.8941) — la
+  0.8933, estadísticamente idéntico a simplemente eliminarlas (0.8931) — la
   evidencia de que el cierre de la fuga es real y no un side-effect distinto.
   Ver `outputs/decisiones/log_decisiones.csv` (clave `fuga_recencia_antiguedad`)
   para la investigación completa.

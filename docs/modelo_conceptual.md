@@ -179,7 +179,7 @@ flowchart TD
 Ese primer control ya se activó en la práctica: el AUC llegó a **0,9497** y la
 investigación encontró una fuga real — tres variables de recencia y antigüedad
 se calculaban incluyendo los dos productos que definen la etiqueta. Corregidas,
-el AUC quedó en **0,8942**, que es la cifra que se reporta.
+el AUC quedó en **0,8933**, que es la cifra que se reporta.
 
 ---
 

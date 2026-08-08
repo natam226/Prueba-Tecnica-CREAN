@@ -239,8 +239,12 @@ def _ficha_de_cliente(lista, base):
     top = evidencia.head(10)
     izq, der = st.columns([3, 2])
     with izq:
+        # Al gráfico solo se le pasan las columnas que usa. `valor_cliente`
+        # mezcla números, texto y nulos, y Altair también serializa vía Arrow:
+        # incluirla dispara el mismo fallo de conversión que la tabla.
+        datos_grafico = top[["variable", "bin", "direccion", "woe"]]
         st.altair_chart(
-            alt.Chart(top).mark_bar(cornerRadiusEnd=3).encode(
+            alt.Chart(datos_grafico).mark_bar(cornerRadiusEnd=3).encode(
                 y=alt.Y("variable:N", sort="-x", title=None),
                 # Se grafica -woe para que "hacia la derecha" signifique
                 # a favor; con el signo crudo el gráfico se lee al revés.
@@ -253,7 +257,15 @@ def _ficha_de_cliente(lista, base):
             ).transform_calculate(a_favor="-datum.woe")
             .properties(width="container", height=300))
     with der:
-        st.dataframe(top[["variable", "valor_cliente", "direccion"]],
+        # `valor_cliente` mezcla números, texto y nulos: un saldo junto a
+        # "preferencial" y junto a un None legítimo (la variable cae en el
+        # tramo "Sin dato"). Arrow no serializa columnas de tipo mixto, y
+        # `astype(str)` no basta porque en pandas 3 deja los nulos como float.
+        # Se formatea cada valor a texto, con guion para los nulos.
+        tabla_evidencia = top[["variable", "valor_cliente", "direccion"]].assign(
+            valor_cliente=lambda d: d["valor_cliente"].map(
+                lambda v: "—" if pd.isna(v) else str(v)))
+        st.dataframe(tabla_evidencia,
                      hide_index=True, width="stretch", height=300,
                      column_config={
                          "variable": st.column_config.TextColumn("Característica"),

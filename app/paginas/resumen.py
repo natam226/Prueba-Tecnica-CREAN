@@ -61,8 +61,8 @@ para modelar con estabilidad. La unión fue una decisión pragmática y conviene
 declararla.
 
 Se probó una definición alternativa que exige actividad en los últimos 90 días:
-el AUC pasa de 0,8942 a 0,8909 y la correlación de rangos entre ambos
-ordenamientos es 0,99. **La elección de etiqueta es robusta**: solo el 9,7% de
+el AUC pasa de 0,8933 a 0,8896 y la correlación de rangos entre ambos
+ordenamientos es 0,99. **La elección de etiqueta es robusta**: solo el 9,6% de
 los clientes cambia de nivel y casi todos se mueven un solo escalón.
             """)
 

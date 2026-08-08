@@ -59,8 +59,8 @@
         App. Usar solo Invesbot habría dado una tasa base de 0,59%, demasiado
         rara para modelar con estabilidad.</p>
         <p>Se probó una definición alternativa que exige actividad en los
-        últimos 90 días: el AUC pasa de 0,8942 a 0,8909 y la correlación entre
-        ambos ordenamientos es 0,99. <b>La elección es robusta</b>: solo el 9,7%
+        últimos 90 días: el AUC pasa de 0,8933 a 0,8896 y la correlación entre
+        ambos ordenamientos es 0,99. <b>La elección es robusta</b>: solo el 9,6%
         de los clientes cambia de nivel.</p>
       </details>
 
@@ -197,7 +197,7 @@
 
       <h3>¿Qué tan bien funciona? Traducido</h3>
       <div class="respuesta">
-        <span class="rotulo">Qué significa 0,894</span>
+        <span class="rotulo">Qué significa 0,893</span>
         Si tomamos al azar un cliente que sí invierte y otro que no, el modelo
         le da mayor puntaje al correcto <b>89 de cada 100 veces</b>. El azar
         acertaría 50.
@@ -385,7 +385,7 @@
 
       <div class="kpis">
         <div class="kpi"><div class="r">Fuga de información</div>
-          <div class="v">0,950 → 0,894</div><div class="d">el control se disparó</div></div>
+          <div class="v">0,950 → 0,893</div><div class="d">el control se disparó</div></div>
         <div class="kpi"><div class="r">Sesgo por dato faltante</div>
           <div class="v">19× → 5,6×</div><div class="d">estaba confundido</div></div>
         <div class="kpi"><div class="r">Rango de oportunidad</div>
@@ -412,8 +412,8 @@
           <thead><tr><th>Versión</th><th>AUC</th></tr></thead>
           <tbody>
             <tr><td>Con fuga</td><td class="num">0,9497</td></tr>
-            <tr><td>Corregida</td><td class="num">0,8942</td></tr>
-            <tr><td>Eliminando las variables</td><td class="num">0,8941</td></tr>
+            <tr><td>Corregida</td><td class="num">0,8933</td></tr>
+            <tr><td>Eliminando las variables</td><td class="num">0,8931</td></tr>
           </tbody>
         </table>
         <p>Que la corregida y la versión sin las variables den lo mismo

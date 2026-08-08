@@ -1,5 +1,5 @@
 {
-  "auc": 0.6251154293196495,
+  "auc": 0.6254215964674656,
   "interpretacion": "proxy moderado",
   "accion": "documentar_variables_asociadas",
   "umbral_moderado": 0.6,
@@ -7,43 +7,43 @@
   "variables_mas_asociadas": [
     {
       "variable": "saldo_invertido_no_etiqueta",
-      "importancia": 0.020050727322212338
+      "importancia": 0.019030305851147577
     },
     {
       "variable": "estimador_ingreso",
-      "importancia": 0.01246116989900321
+      "importancia": 0.013891028015803131
     },
     {
       "variable": "ingresos_mensuales",
-      "importancia": 0.011886282222851463
+      "importancia": 0.013878529774224435
     },
     {
       "variable": "grupo_edad_65+",
-      "importancia": 0.01131072674629623
+      "importancia": 0.013172971927000243
     },
     {
       "variable": "total_egresos_mensuales",
-      "importancia": 0.010384142683770081
+      "importancia": 0.009617118906608612
     },
     {
       "variable": "bolsillos_saldo_prom_6m",
-      "importancia": 0.007897046949790432
-    },
-    {
-      "variable": "bolsillos_saldo_snapshot",
-      "importancia": 0.004399853930001307
+      "importancia": 0.0058177787634656085
     },
     {
       "variable": "grupo_edad_50-65",
-      "importancia": 0.004110412978008804
+      "importancia": 0.005117548050327203
     },
     {
-      "variable": "total_activos",
-      "importancia": 0.003914702999655195
+      "variable": "bolsillos_saldo_snapshot",
+      "importancia": 0.004626640204465571
     },
     {
       "variable": "grupo_edad_18-25",
-      "importancia": 0.0038682111577151403
+      "importancia": 0.004207019939397205
+    },
+    {
+      "variable": "total_activos",
+      "importancia": 0.0031185192036670807
     }
   ]
 }

@@ -27,7 +27,7 @@ def render():
         st.subheader("Fuga de información")
         st.metric("AUC antes", "0,950", "el control se disparó",
                   delta_color="inverse")
-        st.metric("AUC real", "0,894", "después de corregir")
+        st.metric("AUC real", "0,893", "después de corregir")
     with c2:
         st.subheader("Sesgo por dato faltante")
         st.metric("Diferencia aparente", "19×", "estaba confundida",
@@ -67,8 +67,8 @@ Se redefinieron sobre las cinco fuentes que **no** definen la etiqueta:
 | Versión | AUC |
 |---|---|
 | Con fuga | 0,9497 |
-| Corregida | **0,8942** |
-| Eliminando las variables por completo | 0,8941 |
+| Corregida | **0,8933** |
+| Eliminando las variables por completo | 0,8931 |
 
 Que la versión corregida y la versión sin las variables den prácticamente lo
 mismo **es la prueba de que la fuga se cerró**. Si quedara contaminación, la

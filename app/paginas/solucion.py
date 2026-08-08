@@ -61,7 +61,7 @@ def render():
         "modelo le da mayor puntaje al correcto <b>89 de cada 100 veces</b>. "
         "Para un problema comercial eso es un desempeño alto: el azar acertaría "
         "50 de cada 100.",
-        rotulo="Qué significa 0,894")
+        rotulo="Qué significa 0,893")
 
     with es.detalle("Qué es el AUC y por qué se usa esa métrica"):
         st.markdown(

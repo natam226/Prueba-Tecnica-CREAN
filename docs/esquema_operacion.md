@@ -114,7 +114,7 @@ recalculan cada mes**, así que un cliente puede moverse de B a A sin que su
 score haya cambiado, simplemente porque la distribución de la población se
 movió. Para una campaña en curso hay que congelar la lista del mes, no
 reconsultarla. El análisis de sensibilidad ya midió la magnitud de este efecto:
-con una definición de etiqueta más exigente, **el 9,7% de los clientes cambia
+con una definición de etiqueta más exigente, **el 9,6% de los clientes cambia
 de nivel**, aunque casi todos se mueven solo un escalón (correlación de rangos
 de Spearman = 0,99).
 
@@ -165,7 +165,7 @@ indicador de monitoreo es decoración.
 
 | Indicador | Umbral de alerta | Frecuencia | Responsable | Acción |
 |---|---|---|---|---|
-| AUC sobre etiquetas nuevas | Caída > 0,05 respecto a 0,894 | Mensual | Analítica | Adelantar reentrenamiento |
+| AUC sobre etiquetas nuevas | Caída > 0,05 respecto a 0,893 | Mensual | Analítica | Adelantar reentrenamiento |
 | AUC por encima del techo | > 0,95 | Cada entrenamiento | Analítica | **Detener**: sospecha de fuga |
 | Deriva de variables (PSI) | > 0,25 en una variable del top 10 | Mensual | Analítica | Investigar el origen |
 | Regla del 80% | Razón < 0,80 | Mensual | Riesgo / Cumplimiento | Documentar antes de operar |
@@ -200,7 +200,7 @@ indefinidamente en el mismo archivo.
 | Notebooks versionados con sus salidas | Que no se pueda reconstruir qué produjo una cifra |
 
 El guardián anti-fuga ya demostró su valor: detectó una fuga real que inflaba
-el AUC de 0,894 a 0,950. Sin él, la solución se habría entregado con una cifra
+el AUC de 0,893 a 0,950. Sin él, la solución se habría entregado con una cifra
 falsa y habría fallado en producción sin explicación.
 
 ### La evolución no es opcional: la etiqueta caduca
