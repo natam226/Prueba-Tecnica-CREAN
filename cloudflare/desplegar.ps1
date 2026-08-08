@@ -48,6 +48,15 @@ if (-not (Test-Path "seed/schema.sql")) {
 $trozos = Get-ChildItem "seed/clientes_*.sql" | Sort-Object Name
 Write-Host "  seed listo: $($trozos.Count) archivos de clientes"
 
+# Cargar 117 MB a D1 y descubrir despues que el volcado estaba mal es caro en
+# tiempo y en cuota de escritura. Se comprueba antes, contra un SQLite local.
+Write-Host "  Verificando el volcado..."
+Push-Location ..
+& "venv/Scripts/python.exe" cloudflare/scripts/verificar_seed.py
+$verificacion = $LASTEXITCODE
+Pop-Location
+if ($verificacion -ne 0) { throw "el volcado no paso la verificacion; no se sube nada" }
+
 # --- 1. Dependencias ------------------------------------------------------
 Paso 1 "Instalando wrangler"
 npm install
