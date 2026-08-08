@@ -4,6 +4,7 @@ import json
 import pandas as pd
 
 import config
+from oro import esquema
 from src.db_io import leer_tabla_sqlite, escribir_tabla_sqlite
 from src.decisiones import decidir_perfil_incompleto
 from src.derivadas import (
@@ -248,7 +249,8 @@ def construir_cliente_features():
     # siendo la señal disponible en ese caso.
     base = agregar_perfil_incompleto(base)
 
-    escribir_tabla_sqlite(base, config.ORO_DB, "cliente_features")
+    escribir_tabla_sqlite(base, config.ORO_DB, "cliente_features",
+                          ddl=esquema.ddl_de(base, "cliente_features"))
     return base
 
 

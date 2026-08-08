@@ -9,6 +9,7 @@ Implementa `SPEC_V2.md` con las decisiones de `DECISIONES.md`.
 
 | Documento | Contenido |
 |---|---|
+| [`docs/diccionario_datos.md`](docs/diccionario_datos.md) | Las 90 columnas de `cliente_features` y las restricciones del esquema estrella. **Generado**, no escrito a mano |
 | [`docs/modelo_conceptual.md`](docs/modelo_conceptual.md) | Modelo conceptual, diagrama de procesos con actores y puntos de decisión, y aporte a los procesos de CREAN |
 | [`docs/esquema_operacion.md`](docs/esquema_operacion.md) | Cómo se generan, actualizan y consumen los resultados; seguimiento, mantenimiento y evolución |
 | `DECISIONES.md` | Razonamiento narrativo detrás de cada decisión analítica |
@@ -71,7 +72,15 @@ importa:
     "C:\Users\natam\OneDrive\Desktop\Prueba-Tecnica-CREAN\venv\Scripts\python.exe" scripts/export_powerbi.py
     ```
 
-11. **Interfaz de resultados** — lee los artefactos de `outputs/`, no recalcula
+11. **Diccionario de datos** — regenera `docs/diccionario_datos.md` desde la
+    base real: las 90 columnas de `cliente_features` con su papel en los
+    modelos, y las restricciones del esquema estrella.
+
+    ```
+    "C:\Users\natam\OneDrive\Desktop\Prueba-Tecnica-CREAN\venv\Scripts\python.exe" scripts/diccionario_datos.py
+    ```
+
+12. **Interfaz de resultados** — lee los artefactos de `outputs/`, no recalcula
     nada. Corre en local, sin desplegar:
 
     ```
@@ -84,7 +93,7 @@ bases de datos temporales).
 
 ## Estado de verificación (léase antes de confiar en cualquier cifra)
 
-Los 11 pasos se han ejecutado de punta a punta sobre los datos reales, y las
+Los 12 pasos se han ejecutado de punta a punta sobre los datos reales, y las
 cifras de la sección siguiente vienen de esas corridas. El export produce los 8
 archivos y falla explícitamente si falta cualquier insumo, así que un export
 completo es en sí mismo la comprobación de que la cadena corrió entera.
@@ -177,10 +186,16 @@ reporta su conteo de filas):
   `n_obs_ventana`, `tenencia`) y en un panel mensual con forward-fill
   (`saldos_mensual_plata`, base de `fact_saldos_mensual` y del modelo de monto
   a 12 meses), escribiendo a `plata/data/plata.db`.
+- **El esquema de oro está declarado** en `oro/esquema.py`: llaves primarias,
+  NOT NULL, tres llaves foráneas dentro del esquema estrella e índices sobre
+  las columnas que las consultas usan de verdad. `pandas.to_sql` crea tablas
+  sin ninguna restricción, así que durante buena parte del proyecto la
+  integridad se sostuvo solo en las pruebas; ahora la base la hace cumplir.
+  Las foráneas se verifican con `PRAGMA foreign_keys = ON` al escribir el
+  estrella, que por eso se escribe entero y en orden de dependencia.
 - **oro** (`oro/`): pivotea las tablas plata a nivel cliente
   (`cliente_features`, con `etiqueta_adopcion`) y arma un esquema estrella
-  (`dim_cliente`, `dim_producto`, `dim_tiempo` mensual, `fact_saldos` snapshot,
-  `fact_saldos_mensual`) en `oro/data/oro.db`, listo para BI. `dim_cliente`
+  (`dim_cliente`, `dim_producto`, `dim_tiempo` mensual y `fact_saldos_mensual`) en `oro/data/oro.db`, listo para BI. `dim_cliente`
   incluye `desc_genero` — se conserva **exclusivamente** para la auditoría de
   sesgo (`notebooks/07_auditoria_sesgo.ipynb`) y para caracterización
   descriptiva del tablero; la exclusión de `desc_genero` como predictora del

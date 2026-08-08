@@ -16,6 +16,7 @@ ahora tienen dependencias reales entre sí. Orden obligatorio:
     8. notebooks/07_auditoria_sesgo.ipynb      -> fact_auditoria_sesgo.csv
     9. notebooks/05_dimensionamiento.ipynb     -> dimensionamiento.csv
    10. python scripts/export_powerbi.py        (falla si falta algún insumo)
+   11. python scripts/diccionario_datos.py     -> docs/diccionario_datos.md
 
 Por qué el orden 3 -> 4 es obligatorio y no solo recomendado: paso 4 vuelve a
 ejecutar `oro/construir_cliente_features.py`, que lee

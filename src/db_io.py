@@ -26,11 +26,29 @@ def leer_tabla_sqlite(db_path: Path, tabla: str) -> pd.DataFrame:
         con.close()
 
 
-def escribir_tabla_sqlite(df: pd.DataFrame, db_path: Path, tabla: str, if_exists: str = "replace") -> None:
+def escribir_tabla_sqlite(df: pd.DataFrame, db_path: Path, tabla: str,
+                          if_exists: str = "replace", ddl: str | None = None,
+                          indices: list[str] | None = None) -> None:
+    """Escribe `df`. Con `ddl`, crea la tabla declarada en vez de dejar que
+    pandas improvise una sin restricciones.
+
+    `pandas.to_sql` genera tablas sin llave primaria, sin foráneas, sin
+    NOT NULL y sin índices: la integridad queda a cargo de quien escriba, no de
+    la base. Pasando `ddl` la tabla se crea primero con sus restricciones y los
+    datos entran por `append`, así que una violación falla al insertar en vez
+    de aparecer semanas después como una cifra rara.
+    """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     try:
-        df.to_sql(tabla, con, if_exists=if_exists, index=False)
+        if ddl and if_exists == "replace":
+            con.execute(f'DROP TABLE IF EXISTS "{tabla}"')
+            con.executescript(ddl)
+            df.to_sql(tabla, con, if_exists="append", index=False)
+        else:
+            df.to_sql(tabla, con, if_exists=if_exists, index=False)
+        for sentencia in indices or []:
+            con.execute(sentencia)
         con.commit()
     finally:
         con.close()
