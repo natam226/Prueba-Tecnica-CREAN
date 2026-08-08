@@ -93,6 +93,48 @@ no haya export a que haya un export parcial silencioso.**
 programado el primer día hábil del mes, con el export como tarea final y
 notificación en caso de fallo.
 
+### La capa de publicación se opera aparte
+
+Publicar la vitrina web tiene su propia cadena, y **corre a dos velocidades
+distintas**. Esta separación es la fuente de error operativo más probable de
+toda la solución, así que conviene entenderla antes de operarla.
+
+```mermaid
+flowchart LR
+    subgraph AUT["Automático · en cada push a main"]
+        A1["Pruebas"] --> A2["Empaquetado<br/>del Worker"]
+        A2 --> A3["Publicación<br/>del código"]
+    end
+
+    subgraph MAN["Manual · tras cada corrida del pipeline"]
+        M1["generar_seed.py"] --> M2["verificar_seed.py<br/><i>contra un SQLite local</i>"]
+        M2 --> M3["Carga a D1<br/>860.223 filas"]
+    end
+
+    AUT --> W["Vitrina publicada"]
+    MAN --> W
+
+    style AUT fill:#E6F2EC,stroke:#2E8B57
+    style MAN fill:#FBF3DC,stroke:#D9A441
+```
+
+| | Qué publica | Quién lo dispara | Por qué así |
+|---|---|---|---|
+| **Código** | Worker y páginas | `git push` a `main` | Es liviano y se valida con pruebas |
+| **Datos** | La tabla `cliente` en D1 | Una persona, a mano | El volcado son 117 MB no versionados, y generarlo exige `oro.db`, que tampoco lo está |
+
+**La consecuencia, dicha sin rodeos:** publicar código **no** actualiza los
+datos. Si se vuelve a correr el pipeline y nadie recarga D1, la vitrina sigue
+mostrando la corrida anterior con toda naturalidad — sin error, sin aviso, con
+cifras que ya no son las del tablero. Es un fallo silencioso, que es la peor
+clase.
+
+Dos cosas lo contienen. `verificar_seed.py` carga el volcado en un SQLite local
+y comprueba las 860.223 filas, la coherencia de los totales precalculados y que
+las cifras publicadas coincidan con las del tablero, todo **antes** de subir
+nada. Y el indicador de frescura de la sección 5 lo vuelve visible cuando aun
+así se escapa.
+
 ---
 
 ## 3. Actualización
@@ -108,6 +150,8 @@ Qué se recalcula y qué se conserva en cada ciclo.
 | **Coeficientes del modelo** | **Trimestral** | Reentrenamiento, o alerta |
 | Tasa de captura asumida | Trimestral | **Decisión del negocio**, no del modelo |
 | Umbrales de decisión | Cuando se justifique | Cambio documentado en `config.py` |
+| Código de la vitrina | Cada push a `main` | Automático (GitHub Actions) |
+| **Datos de la vitrina (D1)** | Tras cada corrida del pipeline | **Manual**: el workflow no los toca |
 
 Un detalle de operación que conviene fijar desde el inicio: **los niveles se
 recalculan cada mes**, así que un cliente puede moverse de B a A sin que su
@@ -129,9 +173,10 @@ Tres canales para tres audiencias. La misma cifra en todos: la fuente única es
 flowchart LR
     F["<b>fact_cliente_score</b><br/>860.223 clientes<br/>+ 7 entregables de apoyo"]
 
-    F --> A["<b>Tablero Streamlit</b><br/>Analítica y producto<br/>6 vistas, exploración"]
+    F --> A["<b>Tablero Streamlit</b><br/>Analítica y producto<br/>7 vistas, exploración"]
     F --> B["<b>Power BI</b><br/>Dirección y seguimiento<br/>esquema estrella"]
     F --> C["<b>CSV / CRM</b><br/>Equipo comercial<br/>lista priorizada"]
+    F --> D["<b>Vitrina web</b><br/>Cloudflare Workers + D1<br/>consulta pública sin instalar nada"]
 
     style F fill:#E6F2EC,stroke:#2E8B57
 ```
@@ -141,6 +186,7 @@ flowchart LR
 | Tablero Streamlit | Analítica, producto | Todo el detalle: caracterización, sustento del modelo, supuestos | Bajo demanda |
 | Power BI | Dirección, seguimiento | Evolución del dimensionamiento y de la base priorizada | Mensual |
 | CSV a CRM | Comercial | A quién llamar esta semana | Mensual, congelado por campaña |
+| Vitrina web (Workers + D1) | Cualquiera con el enlace | Las mismas cifras, consultables sin instalar nada | Código: automático. **Datos: manual** |
 
 **Advertencias que deben viajar con el dato, no aparte:**
 
@@ -173,6 +219,7 @@ indicador de monitoreo es decoración.
 | Error de backtest del monto | Mediana del APE > 10% | Trimestral | Analítica | Recalibrar el recentrado |
 | **Tasa de captura real vs asumida** | Desvío > 10 puntos | Mensual tras el lanzamiento | CREAN / Producto | Actualizar `config.TASAS_CAPTURA` |
 | Cobertura de la campaña | Conversión real vs precisión esperada | Por campaña | Comercial | Ajustar el percentil de corte |
+| **Frescura de la vitrina** | `auc_modelo_a` en D1 ≠ el del tablero, o fecha de carga anterior a la última corrida | Tras cada corrida | Analítica | Regenerar el volcado y recargar D1 |
 
 El indicador de la última fila es el más importante y hoy **no se puede medir**:
 la tasa de captura es el supuesto que sostiene toda la cifra de oportunidad y
@@ -194,7 +241,8 @@ indefinidamente en el mismo archivo.
 | Mecanismo | Qué previene |
 |---|---|
 | Guardián anti-fuga (`src/fuga.py`) | Que una variable derivada de la etiqueta entre al modelo. Corre en cada entrenamiento y **falla ruidosamente** |
-| 174 pruebas automáticas | Que un cambio rompa el grano, la agregación o el tablero |
+| 208 pruebas automáticas | Que un cambio rompa el grano, la agregación o el tablero |
+| Integración continua en cada push a `main` | Que se publique código que no pasa las pruebas |
 | Reglas de negocio como código (`src/decisiones.py`) | Que una regla viva solo en la cabeza de alguien |
 | Umbrales centralizados (`config.py`) | Que cambiar un criterio requiera editar cinco archivos |
 | Notebooks versionados con sus salidas | Que no se pueda reconstruir qué produjo una cifra |

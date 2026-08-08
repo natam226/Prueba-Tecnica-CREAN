@@ -21,6 +21,27 @@ parecen a la App. Esa decisión es el supuesto que sostiene todo lo demás, y es
 también lo primero que caduca cuando la App salga a producción (ver
 [esquema de operación](esquema_operacion.md), sección de evolución).
 
+### Los objetivos de negocio y el aporte de la solución
+
+Antes de describir cómo funciona, conviene fijar contra qué se mide. Cada fila
+es un objetivo del negocio, no una capacidad técnica, y la última columna es lo
+que hoy está medido — no lo que se espera.
+
+| Objetivo de negocio | Cómo aporta la solución | Evidencia medida |
+|---|---|---|
+| Lanzar la App con una meta sustentada | Dimensiona el volumen con el supuesto a la vista | 1,86 billones COP de entrada bruta; **186 / 465 / 744** mil M según la tasa de captura que asuma el negocio |
+| Concentrar el esfuerzo comercial | Ordena por propensión dentro de cada población | Contactar el **10%** mejor rankeado alcanza al **51,2%** de los adoptantes: 5,1× la tasa base |
+| No dejar clientes fuera del análisis | Puntúa al 100% de la base, no solo a quien ya invierte | **860.223** clientes con score, cero nulos |
+| Activar a quien ya es cliente | Aísla a quien tiene productos pero ninguno de inversión | **309.928** clientes: uso no realizado, no adquisición |
+| Retener saldo que se está yendo | Identifica la salida proyectada, no solo la entrada | **40.137** clientes, −0,76 billones COP |
+| Decidir con evidencia, no con opinión | Declara y mide cada supuesto | 64 variables validadas estadísticamente; log de decisiones *append-only* |
+| Operar sin riesgo reputacional | Audita el sesgo antes de que la lista se use | Regla del 80% por atributo protegido; proxy de género 0,625 (moderado) |
+
+Dos de estas filas merecen subrayarse porque **no estaban en el encargo** y
+salieron del mismo modelo: la población de activación y el bloque de retención.
+El encargo pedía a quién ofrecerle la App; el modelo, al proyectar el cambio de
+saldo, también señala a quién se está por perder.
+
 De ahí se derivan tres conceptos que estructuran la solución entera:
 
 | Concepto | Qué es | Por qué existe |
@@ -97,6 +118,7 @@ flowchart TD
     SC --> C1["Tablero Streamlit"]
     SC --> C2["Power BI"]
     SC --> C3["Lista de contacto CSV"]
+    SC --> C4["Vitrina web<br/>Cloudflare Workers + D1"]
 
     style BR fill:#F5E9D7,stroke:#B08D57
     style PL fill:#ECEFF1,stroke:#78909C
@@ -121,6 +143,85 @@ motivo y su evidencia medida.
 ---
 
 ## 3. Diagrama de procesos: flujos, actores y decisiones
+
+### 3.1 Quién interviene
+
+Seis actores. La columna que más importa es la tercera: **qué decide cada uno**,
+porque delimita dónde termina el modelo y dónde empieza el criterio del negocio.
+
+| Actor | Qué recibe | Qué decide | Qué entrega |
+|---|---|---|---|
+| **TI / Plataforma** | — | Nada del proceso analítico | Extractos mensuales de las 7 fuentes |
+| **Analítica** | Los extractos | Qué variable entra al modelo · si hay fuga · si se reentrena | Score, nivel, monto y auditoría |
+| **Riesgo y Cumplimiento** | Informe de sesgo | **Si la lista se puede operar** | Visto bueno, o hallazgo documentado |
+| **CREAN / Producto** | Dimensionamiento | **La tasa de captura que se asume** | Meta de lanzamiento |
+| **Comercial** | Lista priorizada | Hasta qué percentil se contacta | Resultado real de contacto |
+| **Dirección** | Meta y su supuesto | Inversión y alcance del lanzamiento | Presupuesto |
+
+Hay una frontera que conviene no borrar: **el modelo no decide la tasa de
+captura ni el percentil de corte**. Entrega el ordenamiento y la curva de
+esfuerzo; cuánto se captura y a cuántos se llama son decisiones de negocio con
+consecuencias de presupuesto. Presentarlas como salidas del modelo sería
+atribuirle una autoridad que no tiene.
+
+### 3.2 Flujos de información entre actores
+
+Las flechas continuas son entregas; las punteadas, retroalimentación. Cada
+etiqueta es el artefacto concreto que cambia de manos, no una relación genérica.
+
+```mermaid
+flowchart TB
+    subgraph TI["TI / Plataforma"]
+        TI1["Sistemas fuente<br/>7 orígenes operativos"]
+    end
+
+    subgraph AN["Analítica"]
+        AN1["Pipeline medallón<br/>bronce · plata · oro"]
+        AN2["Modelos A, B y monto 12m"]
+        AN3["Validación y auditoría"]
+        AN1 --> AN2
+        AN2 --> AN3
+    end
+
+    subgraph RC["Riesgo y Cumplimiento"]
+        RC1["Revisión de sesgo<br/>y de proxies"]
+    end
+
+    subgraph PD["CREAN / Producto"]
+        PD1["Tasa de captura<br/>y meta de lanzamiento"]
+    end
+
+    subgraph CM["Comercial"]
+        CM1["Percentil de corte<br/>y ejecución de campaña"]
+    end
+
+    subgraph DI["Dirección"]
+        DI1["Decisión de inversión"]
+    end
+
+    TI1 -->|"extractos mensuales"| AN1
+    AN3 -->|"informe de sesgo"| RC1
+    RC1 -->|"visto bueno o hallazgo"| CM1
+    AN2 -->|"dimensionamiento"| PD1
+    AN2 -->|"lista priorizada<br/>niveles A/B/C/D"| CM1
+    PD1 -->|"meta y supuesto"| DI1
+    PD1 -->|"cupo de campaña"| CM1
+    CM1 -.->|"resultado real de contacto"| AN2
+    DI1 -.->|"presupuesto"| PD1
+
+    style AN fill:#E8F1F5,stroke:#1F6F8B
+    style RC fill:#FBF3DC,stroke:#D9A441
+    style PD fill:#E6F2EC,stroke:#2E8B57
+    style CM fill:#E6F2EC,stroke:#2E8B57
+```
+
+El lazo punteado de Comercial hacia los modelos es el que cierra el sistema: sin
+el resultado real del contacto, la solución nunca aprende de sí misma y se queda
+prediciendo un proxy indefinidamente. Hoy ese lazo **no está conectado** — es
+trabajo de integración con el CRM, y está en la hoja de ruta del
+[esquema de operación](esquema_operacion.md).
+
+### 3.3 El proceso de punta a punta
 
 Los rombos son **puntos de decisión** con criterio explícito y consecuencia
 definida. No son revisiones informales: cada uno tiene un umbral en
@@ -165,7 +266,7 @@ flowchart TD
     style P fill:#E6F2EC,stroke:#2E8B57
 ```
 
-### Los puntos de decisión, uno por uno
+### 3.4 Los puntos de decisión, uno por uno
 
 | Decisión | Criterio | Si no se cumple | Dónde vive |
 |---|---|---|---|
@@ -225,8 +326,8 @@ de clientes.*
 Es el proceso que la solución alimenta de forma más directa, y por **los dos
 lados**:
 - *Afiliar*: la lista priorizada de contacto. Contactando al 10% mejor
-  rankeado se alcanza al **51,7% de los adoptantes** con precisión del 37,0%,
-  **5,2 veces** la tasa base.
+  rankeado se alcanza al **51,2% de los adoptantes** con precisión del 36,7%,
+  **5,1 veces** la tasa base.
 - *Desafiliar*: **40.137 clientes** que el modelo proyecta desinvirtiendo,
   −0,76 billones COP. Es una base de retención nominada, con nombre y cédula,
   que sale del mismo modelo y que nadie estaba mirando.
@@ -270,7 +371,7 @@ Cierre de la cadena: qué produce cada pieza y qué decisión habilita.
 | Pregunta del negocio | Qué la responde | Cifra medida |
 |---|---|---|
 | ¿A quién le hablamos primero? | Nivel de prioridad por población | 215.057 clientes en nivel A |
-| ¿Cuántos contactamos? | Curva precisión/cobertura | Top 10% → 51,7% de cobertura |
+| ¿Cuántos contactamos? | Curva precisión/cobertura | Top 10% → 51,2% de cobertura |
 | ¿Cuánto podría entrar? | Entrada bruta × tasa de captura | 186 / 465 / 744 mil M COP |
 | ¿Es negocio nuevo o traslado? | Descomposición por componente | ≈ mitad viene de CDT y Fiducuenta |
 | ¿A quién estamos por perder? | Bloque de riesgo de retiro | 40.137 clientes, −0,76 billones |

@@ -249,8 +249,8 @@ reporta su conteo de filas):
   prueba automática verifica que ninguna vista pierda su bloque de respuesta.
 
   La vista *A quién contactar* incluye la **curva de esfuerzo**: contactando al
-  10% mejor rankeado se alcanza al 51.7% de los adoptantes con 37.0% de
-  precisión, 5.2× la tasa base. Es la tabla que convierte el AUC en una
+  10% mejor rankeado se alcanza al 51.2% de los adoptantes con 36.7% de
+  precisión, 5.1× la tasa base. Es la tabla que convierte el AUC en una
   decisión operativa. Y la **ficha de cliente** responde «¿y este por qué?» con
   la evidencia de WoE que lo distingue.
 
