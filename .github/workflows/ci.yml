@@ -189,19 +189,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Comprobar credenciales
+        id: credenciales
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "${TOKEN:-}" ]; then
-            echo "::error::Falta el secreto CLOUDFLARE_API_TOKEN. Se crea en" \
-                 "Settings > Secrets and variables > Actions > New repository secret."
-            exit 1
+            echo "::warning::Falta el secreto CLOUDFLARE_API_TOKEN. Se omite" \
+                 "el deploy automatico; el Worker puede publicarse manualmente" \
+                 "con 'pnpm exec wrangler deploy' desde cloudflare/."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
       # El database_id no es una credencial: es el identificador de la base y
       # sin el token no sirve de nada. Puede vivir en wrangler.toml. Se admite
       # tambien como variable del repositorio para quien prefiera no versionarlo.
       - name: Resolver el database_id
+        if: steps.credenciales.outputs.deploy == 'true'
         env:
           ID_D1: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
@@ -219,6 +224,7 @@ jobs:
           fi
 
       - name: wrangler deploy
+        if: steps.credenciales.outputs.deploy == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # Solo hace falta si el token alcanza mas de una cuenta. Si sobra, se
