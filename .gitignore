@@ -26,3 +26,8 @@ cloudflare/seed/
 cloudflare/verificacion.db
 cloudflare/node_modules/
 cloudflare/.wrangler/
+
+ .env
+# Credenciales: nunca se versionan.
+.env
+.env.*
