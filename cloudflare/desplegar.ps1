@@ -38,6 +38,16 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 Write-Host "  node $(node --version)"
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+    if (Get-Command corepack -ErrorAction SilentlyContinue) {
+        corepack enable
+    }
+}
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+    Write-Host "Falta pnpm. Con Node reciente suele bastar: corepack enable" -ForegroundColor Red
+    exit 1
+}
+Write-Host "  pnpm $(pnpm --version)"
 
 if (-not (Test-Path "seed/schema.sql")) {
     Write-Host "  Falta seed/. Generandolo..." -ForegroundColor Yellow
@@ -59,8 +69,8 @@ if ($verificacion -ne 0) { throw "el volcado no paso la verificacion; no se sube
 
 # --- 1. Dependencias ------------------------------------------------------
 Paso 1 "Instalando wrangler"
-npm install
-if ($LASTEXITCODE -ne 0) { throw "npm install fallo" }
+pnpm install --frozen-lockfile
+if ($LASTEXITCODE -ne 0) { throw "pnpm install fallo" }
 
 # --- 2. Autenticacion -----------------------------------------------------
 Paso 2 "Autenticando contra Cloudflare"
@@ -68,20 +78,20 @@ if ($env:CLOUDFLARE_API_TOKEN) {
     Write-Host "  Usando CLOUDFLARE_API_TOKEN del entorno."
 } else {
     Write-Host "  Abriendo el navegador para autorizar..."
-    npx wrangler login
+    pnpm exec wrangler login
     if ($LASTEXITCODE -ne 0) { throw "wrangler login fallo" }
 }
 
 # --- 3. Base de datos -----------------------------------------------------
 Paso 3 "Creando la base D1 '$BASE'"
-$existentes = npx wrangler d1 list --json 2>$null | ConvertFrom-Json
+$existentes = pnpm exec wrangler d1 list --json 2>$null | ConvertFrom-Json
 $db = $existentes | Where-Object { $_.name -eq $BASE }
 if ($db) {
     Write-Host "  Ya existia, se reutiliza."
 } else {
-    npx wrangler d1 create $BASE
+    pnpm exec wrangler d1 create $BASE
     if ($LASTEXITCODE -ne 0) { throw "no se pudo crear la base" }
-    $db = (npx wrangler d1 list --json | ConvertFrom-Json) |
+    $db = (pnpm exec wrangler d1 list --json | ConvertFrom-Json) |
           Where-Object { $_.name -eq $BASE }
 }
 $id = $db.uuid
@@ -96,9 +106,9 @@ Write-Host "  hecho"
 
 # --- 5. Carga -------------------------------------------------------------
 Paso 5 "Cargando el esquema y los catalogos"
-npx wrangler d1 execute $BASE --remote --file="./seed/schema.sql" --yes
+pnpm exec wrangler d1 execute $BASE --remote --file="./seed/schema.sql" --yes
 if ($LASTEXITCODE -ne 0) { throw "fallo la carga del esquema" }
-npx wrangler d1 execute $BASE --remote --file="./seed/catalogos.sql" --yes
+pnpm exec wrangler d1 execute $BASE --remote --file="./seed/catalogos.sql" --yes
 if ($LASTEXITCODE -ne 0) { throw "fallo la carga de catalogos" }
 
 Paso 6 "Cargando 860.223 clientes en $($trozos.Count) trozos (toma varios minutos)"
@@ -106,18 +116,18 @@ $i = 0
 foreach ($t in $trozos) {
     $i++
     Write-Host "  [$i/$($trozos.Count)] $($t.Name)"
-    npx wrangler d1 execute $BASE --remote --file=$($t.FullName) --yes
+    pnpm exec wrangler d1 execute $BASE --remote --file=$($t.FullName) --yes
     if ($LASTEXITCODE -ne 0) { throw "fallo cargando $($t.Name)" }
 }
 
 # --- 7. Verificacion ------------------------------------------------------
 Paso 7 "Verificando la carga"
-npx wrangler d1 execute $BASE --remote --command="SELECT COUNT(*) AS clientes FROM cliente"
+pnpm exec wrangler d1 execute $BASE --remote --command="SELECT COUNT(*) AS clientes FROM cliente"
 Write-Host "  Debe decir 860223. Si dice menos, vuelve a correr el paso 6." -ForegroundColor Yellow
 
 # --- 8. Publicacion -------------------------------------------------------
 Paso 8 "Publicando el Worker"
-npx wrangler deploy
+pnpm exec wrangler deploy
 if ($LASTEXITCODE -ne 0) { throw "el despliegue fallo" }
 
 Write-Host ""

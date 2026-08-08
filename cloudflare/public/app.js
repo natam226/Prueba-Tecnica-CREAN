@@ -31,6 +31,12 @@ function cop(v) {
 
 const pct = (v, d = 1) => (v === null || v === undefined ? "—" : `${(v * 100).toFixed(d)}%`);
 
+function progresoPct(v) {
+  const n = Math.max(0, Math.min(1, Number(v) || 0));
+  return `<span class="mini-progreso"><span style="width:${(n * 100).toFixed(2)}%"></span></span>
+    <span class="mini-progreso-texto">${pct(n, 2)}</span>`;
+}
+
 /** Escapa texto antes de insertarlo como HTML. */
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -47,6 +53,13 @@ function kpi(rotulo, valor, detalle = "") {
   return `<div class="kpi"><div class="r">${esc(rotulo)}</div>
     <div class="v">${esc(valor)}</div>
     ${detalle ? `<div class="d">${esc(detalle)}</div>` : ""}</div>`;
+}
+
+function panelModelo(rotulo, auc, detalle, nota) {
+  return `<div class="panel-modelo"><strong>${esc(rotulo)}</strong>
+    <div class="auc">${esc(auc)}</div>
+    <p>${esc(detalle)}</p>
+    <p>${esc(nota)}</p></div>`;
 }
 
 /**
@@ -181,10 +194,12 @@ const CARGA = {
       const d = await datosResumen();
       const c = d.cifras;
       $("#kpis-modelos").innerHTML =
-        kpi("Modelo A · probabilidad", c.auc_modelo_a.toFixed(3),
-            `${c.n_features_a} variables · 529.470 clientes con productos`) +
-        kpi("Modelo B · parecido", c.auc_modelo_b.toFixed(3),
-            `${c.n_features_b} variables · 330.753 clientes sin productos`);
+        panelModelo("Modelo A · probabilidad", c.auc_modelo_a.toFixed(3),
+            `${c.n_features_a} variables · 529.470 clientes con productos`,
+            "Entrega una probabilidad real de adopción.") +
+        panelModelo("Modelo B · parecido", c.auc_modelo_b.toFixed(3),
+            `${c.n_features_b} variables · 330.753 clientes sin productos`,
+            "Ordena adquisición en frío; no promete conversión.");
 
       const val = await api("/api/validacion");
       tabla($("#tabla-validacion"),
@@ -298,6 +313,8 @@ const CARGA = {
 };
 
 // ------------------------------------------------------- lista de contacto
+let LISTA_ACTUAL = [];
+
 async function montarFiltros() {
   const f = await api("/api/facetas");
   const sel = (id, etq, ops, marcados) =>
@@ -310,9 +327,12 @@ async function montarFiltros() {
     sel("f-nivel", "Nivel", f.niveles, ["A"]) +
     sel("f-segmento", "Segmento", f.segmentos, f.segmentos) +
     `<label>Cuántas filas<input type="number" id="f-limite" value="100" min="10" max="500" step="10"></label>` +
-    `<button class="accion" id="btn-lista">Aplicar</button>`;
+    `<label class="check"><input type="checkbox" id="f-con-monto">Solo con monto estimado</label>` +
+    `<button class="accion" id="btn-lista">Aplicar</button>` +
+    `<button class="accion secundaria" id="btn-csv" type="button">Descargar CSV</button>`;
 
   $("#btn-lista").addEventListener("click", cargarLista);
+  $("#btn-csv").addEventListener("click", descargarLista);
   await cargarLista();
 }
 
@@ -327,10 +347,12 @@ async function cargarLista() {
     if (vs.length) p.set(campo, vs.join(","));
   }
   p.set("limit", $("#f-limite").value || "100");
+  if ($("#f-con-monto")?.checked) p.set("con_monto", "1");
 
   $("#pie-lista").textContent = "Consultando…";
   try {
     const d = await api(`/api/clientes?${p}`);
+    LISTA_ACTUAL = d.filas;
     $("#kpis-lista").innerHTML =
       kpi("Clientes que cumplen", miles(d.total)) +
       kpi("Dinero que podrían mover", cop(d.entrada_bruta)) +
@@ -345,14 +367,50 @@ async function cargarLista() {
        { titulo: "Posición en su grupo", campo: "percentil_en_grupo", clase: "num" },
        { titulo: "Monto 12m", campo: "monto_base_12m", clase: "num" }],
       d.filas,
-      { score: (v) => Number(v).toFixed(4),
-        percentil_en_grupo: (v) => pct(v, 2),
+      { numero_id: (v) => `<button class="id-boton" data-id="${esc(v)}">${esc(v)}</button>`,
+        score: (v) => Number(v).toFixed(4),
+        percentil_en_grupo: (v) => progresoPct(v),
         monto_base_12m: (v) => esc(cop(v)) });
+    document.querySelectorAll(".id-boton").forEach((b) => {
+      b.addEventListener("click", () => {
+        $("#busca-cliente").value = b.dataset.id;
+        buscarCliente();
+      });
+    });
 
     $("#pie-lista").textContent =
       `Se ordena por posición dentro de cada grupo, no por el valor crudo: las ` +
       `escalas de los tres grupos no son comparables entre sí.`;
-  } catch (e) { fallo($("#tabla-clientes"), e); $("#pie-lista").textContent = ""; }
+  } catch (e) {
+    LISTA_ACTUAL = [];
+    fallo($("#tabla-clientes"), e);
+    $("#pie-lista").textContent = "";
+  }
+}
+
+function csvValor(v) {
+  if (v === null || v === undefined) return "";
+  return `"${String(v).replace(/"/g, '""')}"`;
+}
+
+function descargarLista() {
+  if (!LISTA_ACTUAL.length) return;
+  const columnas = ["numero_id", "poblacion", "nivel", "desc_segmento", "grupo_edad",
+    "score", "modelo_usado", "monto_base_12m", "valor_esperado_12m",
+    "percentil_en_grupo"];
+  const lineas = [
+    columnas.join(","),
+    ...LISTA_ACTUAL.map((fila) => columnas.map((c) => csvValor(fila[c])).join(",")),
+  ];
+  const blob = new Blob(["\ufeff" + lineas.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lista_contacto_crean.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function buscarCliente() {
@@ -363,11 +421,15 @@ async function buscarCliente() {
   try {
     const c = await api(`/api/cliente?id=${encodeURIComponent(id)}`);
     destino.innerHTML =
-      `<div class="kpis">` +
+      `<div class="ficha-grid">` +
       kpi("Puntaje", Number(c.score).toFixed(4), `nivel ${c.nivel}`) +
       kpi("Grupo", String(c.poblacion).replace("_", " ")) +
       kpi("Monto estimado 12m", cop(c.monto_base_12m)) +
+      kpi("Valor esperado", cop(c.valor_esperado_12m)) +
       kpi("Segmento", c.desc_segmento ?? "—") +
+      kpi("Edad", c.grupo_edad ?? "—") +
+      kpi("Modelo usado", c.modelo_usado ?? "—") +
+      kpi("Posición en su grupo", pct(c.percentil_en_grupo, 2)) +
       `</div>
       <div class="cautela">El puntaje ordena, no promete. En el grupo sin
       productos mide <b>parecido</b> con quienes invierten, no una probabilidad

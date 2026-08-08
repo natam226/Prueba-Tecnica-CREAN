@@ -122,7 +122,8 @@ async function facetas(env) {
 const TOTAL_CLIENTES = 860223;
 
 async function clientes(env, url) {
-  const condiciones = [];
+  const condicionesCliente = [];
+  const condicionesConteo = [];
   const valores = [];
 
   for (const [param, columna] of [
@@ -133,18 +134,24 @@ async function clientes(env, url) {
     const elegidos = multiple(url, param);
     if (elegidos.length) {
       const c = clausulaIn(columna, elegidos);
-      condiciones.push(c.sql);
+      condicionesCliente.push(c.sql);
+      condicionesConteo.push(c.sql);
       valores.push(...c.valores);
     }
   }
   const soloConMonto = url.searchParams.get("con_monto") === "1";
-  if (soloConMonto) condiciones.push("con_inversion = 1");
+  if (soloConMonto) condicionesCliente.push("con_inversion = 1");
 
   const limite = Math.min(
     parseInt(url.searchParams.get("limit") || "100", 10) || 100,
     TOPE_LISTA
   );
-  const donde = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+  const dondeCliente = condicionesCliente.length
+    ? `WHERE ${condicionesCliente.join(" AND ")}`
+    : "";
+  const dondeConteo = condicionesConteo.length
+    ? `WHERE ${condicionesConteo.join(" AND ")}`
+    : "";
 
   // El total sale de `conteo`, que tiene 24 filas. Contarlo sobre `cliente`
   // costaria leer una entrada de indice por cada coincidencia: 215.057 en el
@@ -152,7 +159,7 @@ async function clientes(env, url) {
   const agregado = await env.DB.prepare(
     `SELECT COALESCE(SUM(${soloConMonto ? "n_con_inversion" : "n"}), 0) AS n,
             COALESCE(SUM(entrada_bruta), 0) AS entrada
-     FROM conteo ${donde}`
+     FROM conteo ${dondeConteo}`
   )
     .bind(...valores)
     .first();
@@ -174,7 +181,7 @@ async function clientes(env, url) {
   const filas = await env.DB.prepare(
     `SELECT numero_id, poblacion, nivel, desc_segmento, grupo_edad, score,
             modelo_usado, monto_base_12m, valor_esperado_12m, percentil_en_grupo
-     FROM cliente INDEXED BY ${indice} ${donde}
+     FROM cliente INDEXED BY ${indice} ${dondeCliente}
      ORDER BY percentil_en_grupo DESC
      LIMIT ?`
   )

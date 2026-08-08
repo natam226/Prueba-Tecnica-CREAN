@@ -87,6 +87,10 @@ nav .aviso {
   margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--linea);
   font-size: 0.78rem; color: var(--tinta-suave);
 }
+nav .aviso-secundario {
+  margin-top: 12px;
+  padding-top: 12px;
+}
 
 main { flex: 1; padding: 34px 40px 90px; max-width: 1180px; }
 section[hidden] { display: none; }
@@ -134,6 +138,46 @@ h4 { font-size: 1rem; margin: 18px 0 6px; color: var(--tinta-suave); }
 }
 .kpi .d { font-size: 0.82rem; color: var(--tinta-suave); }
 
+.paneles-modelo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 18px 0 8px;
+}
+.panel-modelo {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--acento);
+  border-radius: 6px;
+  padding: 15px 17px;
+}
+.panel-modelo strong {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+.panel-modelo .auc {
+  font-size: 1.75rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.panel-modelo p { margin: 5px 0 0; font-size: 0.9rem; color: var(--tinta-suave); }
+
+.callout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+.callout-grid > div {
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  padding: 4px 16px 8px;
+  background: var(--superficie);
+}
+
 .tabla-envoltura { overflow-x: auto; border: 1px solid var(--linea);
   border-radius: 6px; margin: 14px 0; }
 table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
@@ -143,6 +187,38 @@ th { background: var(--acento-tenue); font-weight: 600; font-size: 0.78rem;
 tbody tr:last-child td { border-bottom: 0; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.id { font-family: var(--mono); font-size: 0.82rem; }
+.id-boton {
+  border: 0;
+  background: transparent;
+  color: var(--acento);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.id-boton:hover { color: var(--verde); }
+.mini-progreso {
+  display: inline-block;
+  width: 78px;
+  height: 8px;
+  margin-right: 8px;
+  vertical-align: middle;
+  background: var(--linea);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.mini-progreso span {
+  display: block;
+  height: 100%;
+  background: var(--verde);
+}
+.mini-progreso-texto {
+  display: inline-block;
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
 
 details {
   border: 1px solid var(--linea); border-radius: 6px; padding: 0 16px;
@@ -171,7 +247,19 @@ button.accion {
   cursor: pointer;
 }
 button.accion:hover { filter: brightness(1.08); }
+button.accion.secundaria {
+  background: var(--acento-tenue);
+  color: var(--acento);
+  border: 1px solid var(--linea);
+}
 input[type="range"] { width: 100%; max-width: 460px; accent-color: var(--acento); }
+label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+label.check input { accent-color: var(--acento); }
 
 .barra { display: flex; align-items: center; gap: 9px; margin: 4px 0; }
 .barra .etq { width: 148px; font-size: 0.84rem; flex-shrink: 0; }
@@ -188,6 +276,37 @@ input[type="range"] { width: 100%; max-width: 460px; accent-color: var(--acento)
 .error { border-left: 4px solid var(--terracota); background: rgba(193,85,74,.09);
   padding: 13px 17px; border-radius: 0 5px 5px 0; }
 
+.mini-diagrama {
+  display: grid;
+  grid-template-columns: repeat(9, auto);
+  align-items: stretch;
+  gap: 8px;
+  margin: 14px 0 18px;
+  overflow-x: auto;
+}
+.mini-diagrama div {
+  min-width: 126px;
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  background: var(--superficie);
+  padding: 11px 13px;
+}
+.mini-diagrama b { display: block; color: var(--acento); }
+.mini-diagrama span { display: block; color: var(--tinta-suave); font-size: 0.82rem; }
+.mini-diagrama i {
+  width: 24px;
+  align-self: center;
+  border-top: 2px solid var(--linea);
+}
+.mini-diagrama-ciclo { grid-template-columns: repeat(5, auto); }
+.ficha-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.ficha-grid .kpi { margin: 0; }
+
 @media (max-width: 900px) {
   .marco { flex-direction: column; }
   nav { width: 100%; height: auto; position: static; border-right: 0;
@@ -195,4 +314,6 @@ input[type="range"] { width: 100%; max-width: 460px; accent-color: var(--acento)
   nav button { display: inline-block; width: auto; }
   main { padding: 24px 18px 60px; }
   .dos { grid-template-columns: 1fr; }
+  .mini-diagrama { grid-template-columns: 1fr; }
+  .mini-diagrama i { width: auto; height: 12px; border-top: 0; border-left: 2px solid var(--linea); justify-self: center; }
 }

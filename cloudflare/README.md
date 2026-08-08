@@ -19,6 +19,7 @@ vitrina: rápida, con URL pública y sin nada que instalar para verla.
 ## Requisitos
 
 - Node.js 18 o superior
+- pnpm 11.16.0 (`corepack enable` lo activa en instalaciones recientes de Node)
 - Una cuenta de Cloudflare (el plan gratuito alcanza)
 
 Para el despliegue manual **no hace falta ningún token**: `wrangler login`
@@ -26,16 +27,17 @@ autentica por navegador. El token solo se necesita para el despliegue
 automático desde GitHub Actions (ver más abajo), porque allí no hay un
 navegador donde autorizar.
 
-> No existe `package-lock.json`. Se genera solo con el primer `npm install` y
-> conviene versionarlo: fija las versiones exactas y permite usar `npm ci` en
-> CI, que es más rápido y reproducible.
+El proyecto usa `pnpm-lock.yaml` versionado. CI y despliegue local instalan con
+`pnpm install --frozen-lockfile`, así Wrangler y sus dependencias quedan
+fijadas.
 
 ## Despliegue
 
 ```bash
 cd cloudflare
-npm install
-npx wrangler login
+corepack enable
+pnpm install --frozen-lockfile
+pnpm exec wrangler login
 ```
 
 **1. Generar los datos** (desde la raíz del proyecto, con el pipeline ya corrido):
@@ -50,7 +52,7 @@ Produce `seed/` con el esquema, los catálogos y los clientes en 9 trozos
 **2. Crear la base de datos:**
 
 ```bash
-npx wrangler d1 create crean
+pnpm exec wrangler d1 create crean
 ```
 
 Imprime un `database_id`. **Péguelo en `wrangler.toml`**, reemplazando
@@ -59,20 +61,20 @@ Imprime un `database_id`. **Péguelo en `wrangler.toml`**, reemplazando
 **3. Cargar los datos:**
 
 ```bash
-npx wrangler d1 execute crean --remote --file=./seed/schema.sql
-npx wrangler d1 execute crean --remote --file=./seed/catalogos.sql
+pnpm exec wrangler d1 execute crean --remote --file=./seed/schema.sql
+pnpm exec wrangler d1 execute crean --remote --file=./seed/catalogos.sql
 ```
 
 Y los nueve trozos de clientes. En PowerShell:
 
 ```powershell
-Get-ChildItem seed/clientes_*.sql | ForEach-Object { npx wrangler d1 execute crean --remote --file=$_.FullName }
+Get-ChildItem seed/clientes_*.sql | ForEach-Object { pnpm exec wrangler d1 execute crean --remote --file=$_.FullName }
 ```
 
 Toma varios minutos: son 860.223 filas. Verificar al terminar:
 
 ```bash
-npx wrangler d1 execute crean --remote --command="SELECT COUNT(*) FROM cliente"
+pnpm exec wrangler d1 execute crean --remote --command="SELECT COUNT(*) FROM cliente"
 ```
 
 Debe devolver **860223**.
@@ -80,10 +82,14 @@ Debe devolver **860223**.
 **4. Publicar:**
 
 ```bash
-npx wrangler deploy
+pnpm exec wrangler deploy
 ```
 
-Imprime la URL. Para probar en local antes: `npx wrangler dev`.
+Imprime la URL. Para probar en local antes: `pnpm exec wrangler dev`.
+
+Estado actual: la base D1 `crean` ya existe con
+`database_id = "45ca7c15-30ae-4b09-95a7-8880b4b4e5e0"` y el Worker publico
+esta en `https://crean-tablero.crean-tablero.workers.dev`.
 
 ## Despliegue automático desde GitHub
 

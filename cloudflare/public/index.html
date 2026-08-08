@@ -21,6 +21,8 @@
     <button data-vista="operacion">Cómo opera</button>
     <p class="aviso">Cada sección abre con la respuesta en lenguaje llano. El
       detalle técnico está plegado en los desplegables.</p>
+    <p class="aviso aviso-secundario">Los niveles A/B/C/D no se comparan entre
+      grupos: cada nivel es un cuartil dentro de su propia población.</p>
   </nav>
 
   <main>
@@ -184,7 +186,7 @@
         no de todos los clientes se sabe lo mismo.
       </div>
 
-      <div class="kpis" id="kpis-modelos"></div>
+      <div class="paneles-modelo" id="kpis-modelos"></div>
 
       <div class="cautela">
         <b>La diferencia importa al vender.</b> Un cliente sin productos no
@@ -289,7 +291,7 @@
         puede afirmar con precisión es la cifra agregada, porque depende de
         cuánta gente adopte — y eso todavía no ha pasado.
       </div>
-      <div class="dos">
+      <div class="callout-grid">
         <div>
           <h4>Lo que está medido</h4>
           <ul>
@@ -362,6 +364,13 @@
       <p class="cargando" id="pie-lista"></p>
 
       <h3>¿Y este cliente por qué?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Para qué sirve</span>
+        Seleccione un cliente y verá los datos mínimos para preparar la llamada:
+        puntaje, nivel, grupo, segmento, edad, modelo usado y monto estimado.
+        La explicación causal profunda vive en el Streamlit; esta ficha es la
+        versión operativa para consulta rápida.
+      </div>
       <div class="filtros">
         <label>Identificador del cliente
           <input type="text" id="busca-cliente" placeholder="pegue un ID de la lista"></label>
@@ -438,6 +447,13 @@
       </div>
 
       <h3>Los seis supuestos, en lenguaje llano</h3>
+      <div class="mini-diagrama">
+        <div><b>7 fuentes</b><span>operativas</span></div>
+        <i></i><div><b>Bronce</b><span>ingesta cruda</span></div>
+        <i></i><div><b>Plata</b><span>limpieza mensual</span></div>
+        <i></i><div><b>Oro</b><span>1 fila por cliente</span></div>
+        <i></i><div><b>Worker</b><span>consulta pública</span></div>
+      </div>
       <div class="tabla-envoltura"><table>
         <thead><tr><th>Supuesto</th><th>Qué significa si falla</th></tr></thead>
         <tbody>
@@ -455,6 +471,11 @@
             <td>Prometer conversión sobre ese grupo sería prometer algo no validado</td></tr>
         </tbody>
       </table></div>
+      <div class="mini-diagrama mini-diagrama-ciclo">
+        <div><b>Mensual</b><span>puntajes y auditoría</span></div>
+        <i></i><div><b>Trimestral</b><span>reentrenar y comparar</span></div>
+        <i></i><div><b>Por evento</b><span>deriva o alerta</span></div>
+      </div>
       <div class="respuesta">
         <span class="rotulo">Para qué sirve declararlos</span>
         Ninguno es un defecto: son las condiciones bajo las cuales la solución

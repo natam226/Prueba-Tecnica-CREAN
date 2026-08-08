@@ -10,8 +10,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "crean"
-# Lo imprime `wrangler d1 create crean`. Sin esto el deploy falla.
-database_id = "PEGAR_AQUI_EL_ID_QUE_IMPRIME_WRANGLER"
+database_id = "45ca7c15-30ae-4b09-95a7-8880b4b4e5e0"
 
 [observability]
 enabled = true

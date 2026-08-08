@@ -123,13 +123,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Sin `cache: npm` a proposito: esa opcion exige package-lock.json y
-          # el repositorio no lo tiene todavia (ver README de cloudflare/).
+          cache: pnpm
+          cache-dependency-path: cloudflare/pnpm-lock.yaml
 
-      - run: npm install
+      - run: pnpm install --frozen-lockfile
 
       # `public/app.js` es un script plano que sirve el navegador; nadie lo
       # empaqueta, asi que un error de sintaxis solo aparecerian en produccion.
@@ -152,7 +156,7 @@ jobs:
       # publicar ni pedir credenciales. Aqui se cae un import roto o un error
       # de sintaxis, antes de tocar produccion.
       - name: Empaquetar sin publicar
-        run: npx wrangler deploy --dry-run --outdir=dist
+        run: pnpm exec wrangler deploy --dry-run --outdir=dist
 
   # ---------------------------------------------------------------------------
   desplegar:
@@ -172,11 +176,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: pnpm
+          cache-dependency-path: cloudflare/pnpm-lock.yaml
 
-      - run: npm install
+      - run: pnpm install --frozen-lockfile
 
       - name: Comprobar credenciales
         env:
@@ -214,4 +224,4 @@ jobs:
           # Solo hace falta si el token alcanza mas de una cuenta. Si sobra, se
           # ignora.
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: pnpm exec wrangler deploy
