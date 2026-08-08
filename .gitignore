@@ -20,3 +20,9 @@ outputs/eda/poblacion_*.csv
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+# Cloudflare: los volcados de D1 se regeneran con
+# `python cloudflare/scripts/generar_seed.py` (117 MB, no se versionan).
+cloudflare/seed/
+cloudflare/verificacion.db
+cloudflare/node_modules/
+cloudflare/.wrangler/

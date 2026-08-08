@@ -1,0 +1,17 @@
+{
+  "name": "crean-tablero",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tablero publico de la solucion analitica de la App de inversiones CREAN",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:crear": "wrangler d1 create crean",
+    "db:schema": "wrangler d1 execute crean --remote --file=./seed/schema.sql",
+    "db:catalogos": "wrangler d1 execute crean --remote --file=./seed/catalogos.sql",
+    "db:verificar": "wrangler d1 execute crean --remote --command=\"SELECT COUNT(*) AS clientes FROM cliente\""
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

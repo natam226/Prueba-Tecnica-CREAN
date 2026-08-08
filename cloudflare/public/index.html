@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CREAN · Potencial de adopción de la App de inversiones</title>
+<meta name="description" content="Tablero de resultados de la solución analítica para el lanzamiento de la App de inversiones de CREAN.">
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<div class="marco">
+
+  <nav>
+    <h1><span>CREAN</span>App de inversiones</h1>
+    <button data-vista="resumen" aria-current="true">Resumen</button>
+    <button data-vista="clientes">Los clientes</button>
+    <button data-vista="solucion">La solución</button>
+    <button data-vista="oportunidad">La oportunidad</button>
+    <button data-vista="contactar">A quién contactar</button>
+    <button data-vista="supuestos">Supuestos y sesgos</button>
+    <button data-vista="operacion">Cómo opera</button>
+    <p class="aviso">Cada sección abre con la respuesta en lenguaje llano. El
+      detalle técnico está plegado en los desplegables.</p>
+  </nav>
+
+  <main>
+
+    <!-- ============================================================ -->
+    <section id="resumen">
+      <h2>Potencial de adopción de la App de inversiones</h2>
+      <p class="subtitulo">¿A quién ofrecérsela y cuánto dinero podría entrar?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        CREAN va a lanzar una App de inversiones y necesita saber
+        <b>a quién ofrecérsela</b> y <b>cuánto dinero podría entrar</b>.
+        Integramos las 7 fuentes del banco, ordenamos a los 860.223 clientes por
+        probabilidad de adoptar, y estimamos el monto que moverían los que ya
+        invierten. El resultado es una lista de contacto priorizada y una cifra
+        de oportunidad con su supuesto a la vista.
+      </div>
+
+      <div class="kpis" id="kpis-resumen"></div>
+
+      <h3>El problema de fondo: la App todavía no existe</h3>
+      <div class="nota">
+        Nadie ha adoptado nunca esta App, así que no hay historial que aprender.
+        Lo resolvimos buscando en la base los productos que más se parecen a lo
+        que la App va a ser —<b>Invesbot e Inversión Virtual</b>— y usando su
+        tenencia como sustituto. Todo está construido para que ese sustituto se
+        reemplace por datos reales el día del lanzamiento.
+      </div>
+
+      <details>
+        <summary>Qué tan buena es esa aproximación — y su punto débil</summary>
+        <p>De los <b>61.636 clientes</b> marcados como adoptantes, el
+        <b>91,8%</b> lo es solo por Inversión Virtual y apenas el <b>8%</b>
+        involucra Invesbot — que es el producto conceptualmente más cercano a la
+        App. Usar solo Invesbot habría dado una tasa base de 0,59%, demasiado
+        rara para modelar con estabilidad.</p>
+        <p>Se probó una definición alternativa que exige actividad en los
+        últimos 90 días: el AUC pasa de 0,8942 a 0,8909 y la correlación entre
+        ambos ordenamientos es 0,99. <b>La elección es robusta</b>: solo el 9,7%
+        de los clientes cambia de nivel.</p>
+      </details>
+
+      <h3>La base se parte en tres, y cada parte es otra estrategia</h3>
+      <div class="respuesta">
+        <span class="rotulo">Por qué importa</span>
+        No se le puede hablar igual a quien ya invierte, a quien es cliente pero
+        nunca ha invertido, y a quien no tiene ningún producto.
+        <b>Solo en una de las tres se puede estimar cuánto dinero moverá.</b>
+      </div>
+      <div class="tabla-envoltura"><table id="tabla-poblaciones"></table></div>
+      <div class="nota">
+        Para las dos primeras el monto queda <b>vacío, no en cero</b>. Cero
+        diría «se calculó y da cero»; vacío dice «no se puede calcular».
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="clientes" hidden>
+      <h2>Los clientes</h2>
+      <p class="subtitulo">¿Qué distingue a quien ya invierte de quien no?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        Tres cosas separan a un inversionista de quien no lo es, en este orden:
+        <b>el segmento comercial</b> (un preferencial invierte 12 veces más que
+        un personal), <b>qué tanto se mueve su plata con el banco</b>, y
+        <b>la edad</b> (el pico está entre los 36 y 49 años). El género
+        prácticamente no discrimina y además se excluyó del modelo a propósito.
+      </div>
+
+      <div class="nota" id="nota-tasa-base"></div>
+
+      <h3>1. El segmento comercial es el factor más fuerte</h3>
+      <div id="barras-segmento"></div>
+      <div class="respuesta">
+        <span class="rotulo">Qué dice</span>
+        Casi <b>4 de cada 10</b> clientes preferenciales ya invierten, contra
+        <b>3 de cada 100</b> del segmento personal.
+      </div>
+
+      <h3>2. Qué tanto se mueve la plata del cliente con el banco</h3>
+      <div class="respuesta">
+        <span class="rotulo">Traducido</span>
+        Hay <b>114.431 clientes</b> a los que el banco no le puede estimar el
+        ingreso. Ese estimador se construye mirando cómo entra y sale la plata,
+        así que no tenerlo significa que <b>el cliente casi no transacciona con
+        nosotros</b> — tiene el producto, pero su vida financiera ocurre en otra
+        parte. Entre clientes comparables, invierten <b>5,6 veces menos</b>.
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="r">Con relación transaccional</div>
+          <div class="v">12,1%</div><div class="d">de ellos invierten</div></div>
+        <div class="kpi"><div class="r">Con relación delgada</div>
+          <div class="v">2,2%</div><div class="d">de ellos invierten</div></div>
+        <div class="kpi"><div class="r">Diferencia</div>
+          <div class="v">5,6×</div><div class="d">entre clientes comparables</div></div>
+      </div>
+      <details>
+        <summary>Por qué 5,6 veces y no 19 — la comparación correcta</summary>
+        <p>La comparación directa sobre toda la base da 8,20% contra 0,44%, es
+        decir 19 veces. Pero está <b>confundida</b>: el 80% de los clientes sin
+        estimador tampoco tiene ningún producto, y esa población tiene adopción
+        cero por definición.</p>
+        <p>Comparando solo entre clientes que sí tienen productos: <b>12,08%</b>
+        (n=506.263) contra <b>2,15%</b> (n=23.207) — <b>5,6×</b>. El hallazgo se
+        sostiene; la magnitud honesta es esa.</p>
+        <p><b>Qué se hizo con ellos:</b> no se imputó ningún valor y no se
+        excluyó a nadie. Se añadió una bandera de «falta el dato» y el modelo la
+        usa como predictora. Un modelo entrenado para adivinar quién tiene el
+        dato faltante alcanza AUC 0,886: la ausencia es informativa.</p>
+      </details>
+
+      <h3>3. La edad: el pico está en la mitad de la vida laboral</h3>
+      <div id="barras-edad"></div>
+
+      <h3>¿Influyen el género y el tipo de vivienda?</h3>
+      <div class="dos">
+        <div>
+          <h4>Género</h4>
+          <div id="barras-genero"></div>
+          <div class="cautela">
+            Se excluye por <b>idoneidad, no por falta de poder</b>. Si el género
+            resultara predictivo, estaría reflejando una desigualdad histórica
+            de acceso — no una señal que un modelo comercial deba explotar. Se
+            conserva solo para auditar que no entre por vías indirectas.
+          </div>
+        </div>
+        <div>
+          <h4>Tipo de vivienda</h4>
+          <div id="barras-vivienda"></div>
+          <div class="cautela">
+            Sí influye, pero <b>no por lo que parece</b>. El 69% de la base no
+            tiene ese dato, y quien no lo reporta tiene un patrimonio mediano de
+            $3,9 millones contra $24 millones de quien sí. Mide profundidad de
+            relación más que vivienda.
+          </div>
+        </div>
+      </div>
+
+      <h3>Entonces, ¿qué hace potencial a un cliente?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Síntesis</span>
+        Un cliente de segmento alto, en plena etapa de acumulación, con
+        excedente mensual, que ya mueve varios productos con el banco y cuya
+        plata circula por aquí. <b>Nada de eso es sorprendente — y que no lo sea
+        es buena señal</b>: significa que el modelo aprendió el negocio, no ruido.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="solucion" hidden>
+      <h2>La solución</h2>
+      <p class="subtitulo">¿Qué se construyó y qué tan bien funciona?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        Un sistema que le pone a cada uno de los 860.223 clientes <b>dos
+        números</b>: qué tan probable es que adopte la App, y cuánto dinero
+        movería si lo hace. Hicieron falta <b>dos modelos distintos</b> porque
+        no de todos los clientes se sabe lo mismo.
+      </div>
+
+      <div class="kpis" id="kpis-modelos"></div>
+
+      <div class="cautela">
+        <b>La diferencia importa al vender.</b> Un cliente sin productos no
+        puede tener saldo en Invesbot, así que en esa población <i>nadie</i>
+        figura como adoptante — no hay contra qué comparar. Su puntaje responde
+        «¿cuánto se parece a los que sí invierten?», útil para explorar
+        adquisición en frío, pero <b>no se puede prometer como tasa de
+        conversión</b>.
+      </div>
+
+      <h3>¿Qué tan bien funciona? Traducido</h3>
+      <div class="respuesta">
+        <span class="rotulo">Qué significa 0,894</span>
+        Si tomamos al azar un cliente que sí invierte y otro que no, el modelo
+        le da mayor puntaje al correcto <b>89 de cada 100 veces</b>. El azar
+        acertaría 50.
+      </div>
+      <details>
+        <summary>Qué es el AUC y por qué se usa esa métrica</summary>
+        <p>El AUC mide la probabilidad de ordenar correctamente un par formado
+        por un adoptante y un no adoptante. 0,5 es azar y 1,0 es perfecto.</p>
+        <p>Se usa en vez de la «precisión» porque el problema está muy
+        desbalanceado: solo el 7,2% invierte. Un modelo que dijera «nadie
+        invierte» acertaría el 92,8% de las veces y sería inútil.</p>
+      </details>
+
+      <h3>¿Por qué esas variables y no otras?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Respuesta</span>
+        Ninguna entró por intuición. Las <b>64 candidatas</b> pasaron por cuatro
+        filtros y cada resultado quedó registrado. Entraron <b>54</b>. El filtro
+        <b>rechazó variables que nosotros mismos construimos</b>: un filtro que
+        nunca descarta no está midiendo.
+      </div>
+      <details>
+        <summary>Los cuatro filtros y la tabla completa de 64 variables</summary>
+        <table>
+          <thead><tr><th>Filtro</th><th>Qué pregunta</th><th>Umbral</th></tr></thead>
+          <tbody>
+            <tr><td>Information Value</td><td>¿Separa a quien invierte de quien no?</td><td>IV ≥ 0,02</td></tr>
+            <tr><td>Mann-Whitney / chi²</td><td>¿La diferencia es real o azar?</td><td>p &lt; 0,05</td></tr>
+            <tr><td>Benjamini-Hochberg</td><td>Al probar 64 variables, ¿sobrevive?</td><td>q corregido</td></tr>
+            <tr><td>VIF</td><td>¿Aporta algo que otra no aporte ya?</td><td>VIF &lt; 10</td></tr>
+          </tbody>
+        </table>
+        <p>Probar 64 variables con 5% de tolerancia produce unas 3 que parecen
+        buenas por casualidad. Benjamini-Hochberg controla eso; se prefiere a
+        Bonferroni porque este último descartaría variables útiles.</p>
+        <div class="tabla-envoltura"><table id="tabla-validacion"></table></div>
+      </details>
+
+      <h3>¿Qué variables pesan más?</h3>
+      <div class="filtros">
+        <label>Modelo
+          <select id="sel-modelo"><option value="A">A · probabilidad</option>
+            <option value="B">B · parecido</option></select></label>
+      </div>
+      <div id="barras-importancia"></div>
+      <div class="respuesta">
+        <span class="rotulo">Cómo leerlo</span>
+        Manda la <b>relación con el banco</b>, no la demografía: cuántos
+        productos tiene, cuánto saldo líquido maneja, hace cuánto es cliente. La
+        edad y la vivienda aparecen mucho más abajo. El género no aparece: no
+        está en el modelo.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="oportunidad" hidden>
+      <h2>La oportunidad</h2>
+      <p class="subtitulo">¿Cuánto dinero puede canalizar la App en 12 meses?</p>
+
+      <div class="respuesta" id="respuesta-oportunidad"></div>
+      <div class="kpis" id="kpis-oportunidad"></div>
+
+      <div class="nota">
+        <b>Son tres cifras y responden preguntas distintas.</b><br>
+        · Para dimensionar el lanzamiento, la cifra es la <b>entrada</b>.<br>
+        · Para proyectar el saldo total del banco, la <b>neta</b>.<br>
+        · La <b>salida</b> no es un error de signo: son clientes reales que
+        vienen retirando, un problema de retención que aparece gratis.
+      </div>
+
+      <h3>¿Cuánto de eso se captura realmente?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Cómo usarlo</span>
+        Eso es una <b>decisión y una apuesta comercial</b>, no un resultado
+        estadístico. Mueva la barra para ver el escenario que quiera defender.
+      </div>
+      <label style="font-size:.85rem;color:var(--tinta-suave)">
+        De cada 100 pesos que podrían moverse, ¿cuántos capta la App?
+        <input type="range" id="captura" min="0" max="100" step="5" value="25">
+      </label>
+      <div class="kpis" id="kpis-captura"></div>
+
+      <h3>¿Es un cálculo acertado?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Respuesta honesta</span>
+        <b>Parcialmente, y conviene ser preciso sobre qué parte.</b> El
+        ordenamiento de clientes es sólido y está validado. La estimación de
+        monto por cliente tiene un error mediano del 4,3%. Lo que <b>no</b> se
+        puede afirmar con precisión es la cifra agregada, porque depende de
+        cuánta gente adopte — y eso todavía no ha pasado.
+      </div>
+      <div class="dos">
+        <div>
+          <h4>Lo que está medido</h4>
+          <ul>
+            <li><b>Quién crece y quién no</b>, del comportamiento observado de
+              219.542 clientes durante 13 meses.</li>
+            <li><b>Cuánto crece cada uno</b>, validado contra 3 meses que el
+              modelo no vio.</li>
+            <li><b>El sesgo del modelo</b>: se detectó que sobre-predice y la
+              cifra ya viene corregida.</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Lo que es supuesto</h4>
+          <ul>
+            <li><b>La tasa de captura.</b> Nadie sabe cuánta gente se pasará a
+              una App que no existe.</li>
+            <li><b>Que el pasado se parezca al futuro.</b> 12 meses proyectados
+              con 13 de historia.</li>
+            <li><b>Que la App se parezca</b> a Invesbot e Inversión Virtual.</li>
+          </ul>
+        </div>
+      </div>
+      <details>
+        <summary>Por qué el rango no sale del error del modelo</summary>
+        <p>Sumar el mejor y el peor caso de cada cliente da una banda de
+        <b>ancho 498%</b> de la cifra base, con el extremo inferior negativo:
+        equivale a suponer que los 219.542 clientes fallan todos a la vez en la
+        misma dirección.</p>
+        <p>El extremo contrario —errores independientes— da <b>1,1%</b>, que
+        implicaría una precisión de ±1% en una proyección a 12 meses hecha con
+        13 meses de historia. Nadie se lo cree.</p>
+        <p>La verdad está en medio y <b>no es calculable</b> con una sola
+        ventana de tiempo. Ese callejón sin salida es el hallazgo: la
+        incertidumbre que manda no es el error del modelo, es la adopción.</p>
+      </details>
+
+      <h3>¿De dónde saldría ese dinero?</h3>
+      <div class="tabla-envoltura"><table id="tabla-componentes"></table></div>
+      <div class="cautela">
+        <b>Aproximadamente la mitad no es dinero nuevo.</b> Viene de CDT y
+        Fiducuenta, saldo que el banco ya tiene. Migrarlo tiene valor, pero
+        presentarlo como crecimiento sería contarlo dos veces.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="contactar" hidden>
+      <h2>A quién contactar</h2>
+      <p class="subtitulo">¿Cuántas llamadas hacer y en qué orden?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        Llamando al <b>10% mejor rankeado</b> —17.204 clientes— se alcanza a
+        <b>más de la mitad de todos los que invertirían</b>, y 4 de cada 10
+        llamadas dan en el blanco. Eso es <b>5 veces mejor que llamar al azar</b>.
+      </div>
+
+      <h3>¿Hasta dónde conviene llamar?</h3>
+      <div class="tabla-envoltura"><table id="tabla-curva"></table></div>
+      <div class="nota">
+        <b>Esta es la tabla que convierte el modelo en una decisión.</b> Si una
+        llamada cuesta poco, conviene ir al 20%. Si el equipo es pequeño y cada
+        contacto es caro, el 5% da 44% de acierto. La elección es del negocio.
+      </div>
+
+      <h3>La lista</h3>
+      <div class="filtros" id="filtros-lista"></div>
+      <div class="kpis" id="kpis-lista"></div>
+      <div class="tabla-envoltura"><table id="tabla-clientes"></table></div>
+      <p class="cargando" id="pie-lista"></p>
+
+      <h3>¿Y este cliente por qué?</h3>
+      <div class="filtros">
+        <label>Identificador del cliente
+          <input type="text" id="busca-cliente" placeholder="pegue un ID de la lista"></label>
+        <button class="accion" id="btn-buscar">Buscar</button>
+      </div>
+      <div id="ficha-cliente"></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="supuestos" hidden>
+      <h2>Supuestos y sesgos</h2>
+      <p class="subtitulo">¿Qué asumimos, qué controlamos y qué encontramos?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        Todo modelo descansa sobre supuestos. La diferencia está en si se
+        declaran o se esconden. Aquí están los seis que sostienen esta solución
+        y —lo más importante— <b>los tres problemas reales que los controles
+        encontraron</b> antes de que llegaran a producción.
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="r">Fuga de información</div>
+          <div class="v">0,950 → 0,894</div><div class="d">el control se disparó</div></div>
+        <div class="kpi"><div class="r">Sesgo por dato faltante</div>
+          <div class="v">19× → 5,6×</div><div class="d">estaba confundido</div></div>
+        <div class="kpi"><div class="r">Rango de oportunidad</div>
+          <div class="v">±498%</div><div class="d">inservible, se reemplazó</div></div>
+      </div>
+
+      <div class="respuesta">
+        <span class="rotulo">Por qué esto vende la solución</span>
+        El sistema tiene una regla: <b>si el modelo acierta demasiado, algo está
+        mal</b>. Se disparó con un AUC de 0,950 y se encontró que tres variables
+        estaban mirando, indirectamente, la respuesta que debían predecir. Sin
+        ese control la solución se habría entregado prometiendo un desempeño que
+        no existía.
+      </div>
+
+      <details>
+        <summary>Qué era la fuga y cómo se comprobó que se cerró</summary>
+        <p>Tres variables —hace cuánto se registró el último dato, si tiene dato
+        reciente, y la antigüedad— se calculaban incluyendo las dos fuentes que
+        definen quién es adoptante. Para un adoptante, «hace cuánto se registró
+        su último dato» era muchas veces «hace cuánto se registró su saldo de
+        Invesbot»: una pista directa de la respuesta.</p>
+        <table>
+          <thead><tr><th>Versión</th><th>AUC</th></tr></thead>
+          <tbody>
+            <tr><td>Con fuga</td><td class="num">0,9497</td></tr>
+            <tr><td>Corregida</td><td class="num">0,8942</td></tr>
+            <tr><td>Eliminando las variables</td><td class="num">0,8941</td></tr>
+          </tbody>
+        </table>
+        <p>Que la corregida y la versión sin las variables den lo mismo
+        <b>es la prueba de que la fuga se cerró</b>.</p>
+      </details>
+
+      <h3>¿El modelo discrimina?</h3>
+      <div class="respuesta">
+        <span class="rotulo">Respuesta</span>
+        <b>No de forma evidente, pero hay una señal que vigilar.</b> El género
+        se sacó del modelo, pero sacarlo no basta: si el resto de variables
+        permiten reconstruirlo, el sesgo entra por la puerta de atrás. Lo
+        medimos y da <b>0,625</b>, donde 0,5 es «no se puede reconstruir». Eso
+        es <b>moderado</b>: se documenta y se vigila.
+      </div>
+      <div class="tabla-envoltura"><table id="tabla-sesgo"></table></div>
+      <div class="cautela">
+        <b>La razón sale 0,00 en todos los grupos, pero es un artefacto.</b> El
+        grupo «Sin dato» de género tiene 93 clientes y tasa cero, y arrastra el
+        cociente. Entre femenino (26,7%) y masculino (23,0%) la razón real es
+        <b>0,86, que sí cumple</b>.
+      </div>
+
+      <h3>Los seis supuestos, en lenguaje llano</h3>
+      <div class="tabla-envoltura"><table>
+        <thead><tr><th>Supuesto</th><th>Qué significa si falla</th></tr></thead>
+        <tbody>
+          <tr><td>«Adoptante» = tiene Invesbot o Inversión Virtual</td>
+            <td>Si la App resulta muy distinta, el modelo predice algo adyacente</td></tr>
+          <tr><td>La tasa de captura se elige, no se mide</td>
+            <td>La cifra de oportunidad se mueve proporcionalmente</td></tr>
+          <tr><td>El futuro se parece al pasado reciente</td>
+            <td>12 meses proyectados con 13 de historia; un cambio de ciclo lo invalida</td></tr>
+          <tr><td>La ausencia de dato es informativa</td>
+            <td>Se modela como señal. Si el vacío fuera aleatorio, se añadiría ruido</td></tr>
+          <tr><td>Los niveles no se comparan entre grupos</td>
+            <td>Cada A es el 25% superior del suyo</td></tr>
+          <tr><td>El puntaje de quien no tiene productos es parecido, no probabilidad</td>
+            <td>Prometer conversión sobre ese grupo sería prometer algo no validado</td></tr>
+        </tbody>
+      </table></div>
+      <div class="respuesta">
+        <span class="rotulo">Para qué sirve declararlos</span>
+        Ninguno es un defecto: son las condiciones bajo las cuales la solución
+        es válida. Declararlos permite que el negocio discuta el que le parezca
+        discutible en vez de aceptar o rechazar la cifra entera a ciegas.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="operacion" hidden>
+      <h2>Cómo opera dentro de CREAN</h2>
+      <p class="subtitulo">¿De dónde salen los datos, a qué procesos aportan y cómo se mantiene?</p>
+
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        No es un análisis que se entrega y se archiva: es un <b>proceso
+        mensual</b> que integra siete fuentes del banco, produce una lista
+        priorizada y una cifra de oportunidad, y se vigila a sí mismo. Aporta
+        directamente a cuatro de los siete procesos de CREAN.
+      </div>
+
+      <h3>1. El modelo de datos</h3>
+      <div class="tabla-envoltura"><table>
+        <thead><tr><th>Capa</th><th>Qué contiene</th><th>Nivel de detalle</th><th>Por qué existe</th></tr></thead>
+        <tbody>
+          <tr><td>Bronce</td><td>Las 7 fuentes tal como llegaron</td><td>El de origen</td>
+            <td>Permite auditar contra el dato original</td></tr>
+          <tr><td>Plata</td><td>Datos limpios y agregados</td><td>Cliente-producto y cliente-mes</td>
+            <td>Deduplica y unifica el corte temporal</td></tr>
+          <tr><td>Oro</td><td>Vista analítica + esquema estrella</td><td>Una fila por cliente</td>
+            <td>Es sobre lo que se modela y se consume</td></tr>
+        </tbody>
+      </table></div>
+      <details>
+        <summary>Decisiones de integración que valen la pena mencionar</summary>
+        <p><b>Corte temporal único.</b> Las cinco fuentes de saldo se recortan
+        contra la misma fecha. Con cortes por fuente, «saldo actual»
+        significaría cosas distintas según el producto.</p>
+        <p><b>Relleno hacia adelante con marca.</b> Un saldo no observado no es
+        cero: es el último conocido. Se arrastra, pero cada fila lleva una marca
+        que distingue el dato real del arrastrado.</p>
+        <p><b>Identificadores como texto.</b> <code>numero_id</code> llega a
+        ±9,2 × 10¹⁸, por encima de lo que JavaScript y las hojas de cálculo
+        representan con exactitud. Esta misma web lo maneja como texto de punta
+        a punta por esa razón.</p>
+      </details>
+
+      <h3>2. A qué procesos de CREAN aporta</h3>
+      <div class="tabla-envoltura"><table>
+        <thead><tr><th>Proceso CREAN</th><th>Aporte</th><th>Cómo</th></tr></thead>
+        <tbody>
+          <tr><td>Afiliar / Desafiliar al servicio</td><td>Directo</td>
+            <td>Lista priorizada para afiliar · 40.137 clientes en riesgo de retiro para retener</td></tr>
+          <tr><td>Administrar información</td><td>Directo</td>
+            <td>El pipeline es el ciclo de vida del dato: ingesta, calidad, trazabilidad</td></tr>
+          <tr><td>Monitorear el servicio</td><td>Directo</td>
+            <td>Controles de fuga, sesgo y deriva incluidos en la solución</td></tr>
+          <tr><td>Gestionar el uso del servicio</td><td>Directo</td>
+            <td>309.928 clientes con productos que nunca han invertido</td></tr>
+          <tr><td>Gestionar ingresos y gastos</td><td>Parcial</td>
+            <td>Entrega volumen potencial; no modela la monetización</td></tr>
+          <tr><td>Administrar el servicio</td><td>Parcial</td>
+            <td>Define un ANS implícito de entrega mensual</td></tr>
+          <tr><td>Conciliar transacciones y contabilidad</td><td>No aplica</td>
+            <td>Es integridad contable posterior al hecho; esto es predictivo y previo</td></tr>
+        </tbody>
+      </table></div>
+      <div class="respuesta">
+        <span class="rotulo">El hallazgo que nadie pidió</span>
+        El encaje más fuerte es <b>Afiliar / Desafiliar</b>, y se sirve por los
+        dos lados. Los <b>40.137 clientes que el modelo proyecta
+        desinvirtiendo</b> son una base de retención con nombre y cédula que
+        salió del mismo análisis sin costo adicional.
+      </div>
+
+      <h3>3. Cómo se mantiene viva</h3>
+      <div class="respuesta">
+        <span class="rotulo">En corto</span>
+        Tres ritmos: los resultados se refrescan <b>cada mes</b>, el modelo se
+        reentrena <b>cada trimestre</b>, y ciertos eventos adelantan ese
+        reentrenamiento.
+      </div>
+      <div class="nota">
+        <b>Por qué mensual y no diario:</b> el nivel de detalle útil del dato es
+        el mes. Correrlo a diario movería 9,9 millones de filas sin producir
+        información nueva.
+      </div>
+      <div class="tabla-envoltura"><table>
+        <thead><tr><th>Qué se vigila</th><th>Alerta si</th><th>Cada</th><th>Responsable</th></tr></thead>
+        <tbody>
+          <tr><td>Desempeño del modelo</td><td>Cae más de 0,05</td><td>Mes</td><td>Analítica</td></tr>
+          <tr><td>Sospecha de fuga</td><td>El AUC supera 0,95</td><td>Entrenamiento</td><td>Analítica</td></tr>
+          <tr><td>Deriva de las variables</td><td>Cambia la distribución</td><td>Mes</td><td>Analítica</td></tr>
+          <tr><td>Impacto dispar</td><td>Razón menor a 0,80</td><td>Mes</td><td>Riesgo / Cumplimiento</td></tr>
+          <tr><td>Reconstrucción del género</td><td>Supera 0,70</td><td>Trimestre</td><td>Riesgo / Cumplimiento</td></tr>
+          <tr><td>Tasa de captura real vs asumida</td><td>Se desvía más de 10 puntos</td>
+            <td>Mes tras el lanzamiento</td><td>CREAN / Producto</td></tr>
+        </tbody>
+      </table></div>
+      <div class="cautela">
+        El último indicador es el más importante y <b>hoy no se puede medir</b>.
+        La tasa de captura sostiene toda la cifra de oportunidad y solo se
+        vuelve observable cuando la App esté en producción.
+      </div>
+
+      <h3>4. Qué mejora sola el día del lanzamiento</h3>
+      <div class="respuesta">
+        <span class="rotulo">El argumento para empezar ya</span>
+        La definición actual de «adoptante» es un sustituto que <b>caduca</b>.
+        El día del lanzamiento la etiqueta se vuelve real, <b>330.753 clientes
+        pasan de «parecido» a probabilidad validada</b>, y la tasa de captura
+        deja de ser un supuesto. No es un modelo terminado: es un modelo que
+        empieza a aprender de verdad cuando el producto entra al mercado.
+      </div>
+    </section>
+
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
