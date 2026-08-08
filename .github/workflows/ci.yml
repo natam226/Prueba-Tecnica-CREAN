@@ -1,0 +1,217 @@
+name: CI
+
+# Un solo disparador: push a main. Sin `pull_request` y sin `workflow_dispatch`.
+on:
+  push:
+    branches: [main]
+
+# Un despliegue a la vez. Dos push seguidos no deben pisarse publicando en
+# Cloudflare en desorden: el segundo cancela al primero.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Solo lectura del repositorio. El workflow no escribe commits, ni releases,
+# ni comentarios.
+permissions:
+  contents: read
+
+# QUE HACE Y QUE NO HACE ESTE WORKFLOW
+# ------------------------------------
+# Hace: pruebas de Python, empaquetado del Worker y publicacion en Cloudflare.
+#
+# NO hace: cargar datos en D1. El volcado son 117 MB que no estan versionados
+# (`cloudflare/seed/` esta en .gitignore) y generarlos exige `oro/data/oro.db`,
+# que tampoco se versiona. La carga de las 860.223 filas es una operacion local
+# y de una sola vez -- `cloudflare/desplegar.ps1` --, no algo que corra en cada
+# push. Publicar codigo no toca la tabla `cliente`.
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Que cambio. Los demas trabajos se saltan solos si su area no se toco, que es
+  # lo que significa "desplegar lo que haya cambiado".
+  cambios:
+    name: Detectar que cambio
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.detectar.outputs.python }}
+      cloudflare: ${{ steps.detectar.outputs.cloudflare }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Se necesita el commit anterior para poder comparar contra el.
+          fetch-depth: 0
+
+      - id: detectar
+        env:
+          # Via `env` y no interpolados dentro del `run`: aunque aqui son SHA
+          # que produce GitHub, interpolar `${{ }}` directamente en un script
+          # es el patron que habilita inyeccion de comandos.
+          ANTES: ${{ github.event.before }}
+          AHORA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # `before` viene en ceros en el primer push a la rama, y apunta a un
+          # commit inexistente si se reescribio el historico. En ambos casos no
+          # hay contra que comparar, asi que se corre todo.
+          if [ -z "${ANTES:-}" ] \
+             || [ "$ANTES" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${ANTES}^{commit}" 2>/dev/null; then
+            echo "Sin base comparable: se ejecuta todo."
+            echo "python=true"     >> "$GITHUB_OUTPUT"
+            echo "cloudflare=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ARCHIVOS=$(git diff --name-only "$ANTES" "$AHORA")
+          echo "Archivos tocados en este push:"
+          echo "$ARCHIVOS" | sed 's/^/  /'
+
+          coincide() { printf '%s\n' "$ARCHIVOS" | grep -Eq "$1"; }
+
+          # Tocar el propio workflow revalida ambas areas: si cambio como se
+          # prueba o como se publica, hay que volver a probar y volver a
+          # publicar.
+          PROPIO='^\.github/workflows/'
+
+          if coincide "${PROPIO}|^(src|app|tests|oro|plata|bronce|scripts)/|^(config\.py|requirements\.txt|pyproject\.toml)$"; then
+            echo "python=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "python=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if coincide "${PROPIO}|^cloudflare/"; then
+            echo "cloudflare=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "cloudflare=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  prueba:
+    name: Pruebas (Python)
+    needs: cambios
+    if: needs.cambios.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # En un runner limpio no existen `oro/data/` ni `outputs/powerbi/`: son
+      # artefactos regenerables que no se versionan. Las pruebas que dependen de
+      # ellos se saltan solas (`pytest.mark.skipif`), no fallan. El resultado
+      # esperado es 185 pasadas y 23 saltadas; verificado clonando el
+      # repositorio y corriendo la suite sobre esa copia.
+      - name: pytest
+        run: pytest -q
+
+  # ---------------------------------------------------------------------------
+  construir:
+    name: Empaquetar el Worker
+    needs: cambios
+    if: needs.cambios.outputs.cloudflare == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Sin `cache: npm` a proposito: esa opcion exige package-lock.json y
+          # el repositorio no lo tiene todavia (ver README de cloudflare/).
+
+      - run: npm install
+
+      # `public/app.js` es un script plano que sirve el navegador; nadie lo
+      # empaqueta, asi que un error de sintaxis solo aparecerian en produccion.
+      # `src/index.js` no se revisa aqui porque usa `export default` y
+      # `node --check` lo interpreta como CommonJS y protestaria sin motivo;
+      # de ese se encarga el empaquetado del paso siguiente.
+      - name: Sintaxis del cliente
+        run: node --check public/app.js
+
+      # El marcador de posicion de database_id no es un UUID, y este paso solo
+      # existe para compilar el codigo. Se sustituye por un UUID cualquiera
+      # para que un `wrangler.toml` sin configurar no haga fallar la
+      # compilacion por un motivo que no tiene que ver con el codigo. El id de
+      # verdad lo exige el trabajo `desplegar`, que es donde importa.
+      - name: Neutralizar el marcador de posicion
+        run: |
+          sed -i 's|^database_id = "PEGAR_AQUI.*|database_id = "00000000-0000-0000-0000-000000000000"|' wrangler.toml
+
+      # Compila el Worker con el mismo bundler que usa el despliegue, pero sin
+      # publicar ni pedir credenciales. Aqui se cae un import roto o un error
+      # de sintaxis, antes de tocar produccion.
+      - name: Empaquetar sin publicar
+        run: npx wrangler deploy --dry-run --outdir=dist
+
+  # ---------------------------------------------------------------------------
+  desplegar:
+    name: Publicar en Cloudflare
+    needs: [cambios, prueba, construir]
+    # `!failure() && !cancelled()` en lugar del `success()` implicito: cuando no
+    # hubo cambios en Python el trabajo `prueba` queda SALTADO, y con `success()`
+    # eso arrastraria tambien al despliegue. Lo que se quiere es distinto: que
+    # una prueba SALTADA deje pasar y una prueba FALLIDA detenga la publicacion.
+    if: >-
+      !failure() && !cancelled()
+      && needs.cambios.outputs.cloudflare == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Comprobar credenciales
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::Falta el secreto CLOUDFLARE_API_TOKEN. Se crea en" \
+                 "Settings > Secrets and variables > Actions > New repository secret."
+            exit 1
+          fi
+
+      # El database_id no es una credencial: es el identificador de la base y
+      # sin el token no sirve de nada. Puede vivir en wrangler.toml. Se admite
+      # tambien como variable del repositorio para quien prefiera no versionarlo.
+      - name: Resolver el database_id
+        env:
+          ID_D1: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ID_D1:-}" ]; then
+            sed -i "s|^database_id = .*|database_id = \"${ID_D1}\"|" wrangler.toml
+            echo "database_id tomado de la variable del repositorio."
+          fi
+          if grep -q 'PEGAR_AQUI_EL_ID' wrangler.toml; then
+            echo "::error::wrangler.toml sigue con el marcador de posicion en" \
+                 "database_id. Corre 'wrangler d1 create crean', y pega el id que" \
+                 "imprime en wrangler.toml o guardalo como la variable de" \
+                 "repositorio CLOUDFLARE_D1_DATABASE_ID."
+            exit 1
+          fi
+
+      - name: wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Solo hace falta si el token alcanza mas de una cuenta. Si sobra, se
+          # ignora.
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy

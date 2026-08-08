@@ -12,8 +12,22 @@ Implementa `SPEC_V2.md` con las decisiones de `DECISIONES.md`.
 | [`docs/diccionario_datos.md`](docs/diccionario_datos.md) | Las 90 columnas de `cliente_features` y las restricciones del esquema estrella. **Generado**, no escrito a mano |
 | [`docs/modelo_conceptual.md`](docs/modelo_conceptual.md) | Modelo conceptual, diagrama de procesos con actores y puntos de decisión, y aporte a los procesos de CREAN |
 | [`docs/esquema_operacion.md`](docs/esquema_operacion.md) | Cómo se generan, actualizan y consumen los resultados; seguimiento, mantenimiento y evolución |
+| [`cloudflare/README.md`](cloudflare/README.md) | Publicación web sobre Workers + D1, y el despliegue automático desde GitHub Actions |
 | `DECISIONES.md` | Razonamiento narrativo detrás de cada decisión analítica |
 | `SPEC_V2.md` | Especificación que implementa el pipeline |
+
+## Dónde corre cada cosa
+
+| | Dónde | Qué lo publica |
+|---|---|---|
+| Pipeline, modelos y notebooks | local | — |
+| Tablero del analista (Streamlit) | local, `streamlit run app/tablero.py` | — |
+| Vitrina web pública | Cloudflare Workers | `.github/workflows/ci.yml`, en cada push a `main` |
+| Datos de la vitrina | Cloudflare D1 | carga local y manual, **no** el workflow |
+
+La última fila es la que se olvida: publicar código no actualiza los datos. Si
+se vuelve a correr el pipeline hay que regenerar el volcado y recargar D1 a
+mano, o la web seguirá mostrando la corrida anterior.
 
 ## Setup
 

@@ -26,6 +26,8 @@ cloudflare/seed/
 cloudflare/verificacion.db
 cloudflare/node_modules/
 cloudflare/.wrangler/
+# Salida de `wrangler deploy --dry-run --outdir=dist`, el paso de empaquetado.
+cloudflare/dist/
 
  .env
 # Credenciales: nunca se versionan.
