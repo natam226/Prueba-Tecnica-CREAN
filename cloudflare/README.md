@@ -18,7 +18,7 @@ vitrina: rápida, con URL pública y sin nada que instalar para verla.
 
 ## Requisitos
 
-- Node.js 18 o superior
+- Node.js 24 o superior
 - pnpm 11.16.0 (`corepack enable` lo activa en instalaciones recientes de Node)
 - Una cuenta de Cloudflare (el plan gratuito alcanza)
 
