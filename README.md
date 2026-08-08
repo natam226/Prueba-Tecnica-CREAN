@@ -200,22 +200,34 @@ reporta su conteo de filas):
   notebook, el notebook manda. No carga `fact_saldos_mensual` (9.9 M filas): la
   serie mensual se agrega en el pipeline, no en la capa de presentación.
 
-  Seis vistas, en el orden en que se cuenta la historia, cada una declarando la
-  pregunta que responde:
+  El contenido vive en `app/paginas/`, un módulo por vista. Siete vistas en el
+  orden en que se sustenta, cada una declarando la pregunta que responde:
 
   | Vista | Responde | Requerimiento del brief |
   |---|---|---|
-  | Resumen | Qué se construyó y qué respondió | — |
-  | Caracterización | Quiénes son y quiénes adoptan | 2 · analizar y caracterizar |
-  | Modelos | Cómo se predice y qué tan bien | 3 · uno o más modelos |
-  | Oportunidad | Cuánto vale y bajo qué supuesto | 4 · dimensionar la oportunidad |
-  | Priorización | A quién contactar | 7 · recomendaciones accionables |
-  | Sesgo y supuestos | Qué no sabemos y qué puede salir mal | — |
+  | Resumen | Qué se hizo y para qué | — |
+  | Los clientes | Qué distingue a quien invierte | 2 · analizar y caracterizar |
+  | La solución | Qué se construyó y qué tan bien funciona | 3 · uno o más modelos |
+  | La oportunidad | Cuánto dinero puede entrar | 4 · dimensionar la oportunidad |
+  | A quién contactar | Cuántas llamadas y a quiénes | 7 · recomendaciones accionables |
+  | Supuestos y sesgos | Qué asumimos y qué encontramos | — |
+  | Cómo opera | Datos, procesos CREAN y mantenimiento | 1 · modelo de datos · 5 · procesos · 6 · operación |
 
-  La vista de Modelos incluye la **curva de esfuerzo de contacto**: contactando
-  al 10% mejor rankeado se alcanza al 51.7% de los adoptantes con 37.0% de
+  **Convención de tono, porque el público de la sustentación es mixto:** cada
+  sección abre con la respuesta en lenguaje llano (`estilo.respuesta`) y guarda
+  el sustento técnico en un cajón plegado (`estilo.detalle`). Quien viene del
+  negocio lee la superficie; quien viene de lo técnico abre el cajón. Una
+  prueba automática verifica que ninguna vista pierda su bloque de respuesta.
+
+  La vista *A quién contactar* incluye la **curva de esfuerzo**: contactando al
+  10% mejor rankeado se alcanza al 51.7% de los adoptantes con 37.0% de
   precisión, 5.2× la tasa base. Es la tabla que convierte el AUC en una
-  decisión operativa.
+  decisión operativa. Y la **ficha de cliente** responde «¿y este por qué?» con
+  la evidencia de WoE que lo distingue.
+
+  Los diagramas de *Cómo opera* se dibujan con `st.graphviz_chart` a partir de
+  cadenas DOT — Streamlit los renderiza de forma nativa, sin dependencias
+  nuevas.
 
   `numero_id` se carga como **texto** en el tablero y la exportación sale en
   UTF-8 con BOM: el identificador es un entero de 19 dígitos (hasta ±9.2e18) y

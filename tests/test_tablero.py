@@ -36,8 +36,8 @@ faltan = [a for a in ARTEFACTOS if not (config.OUTPUTS_DIR / a).exists()]
 pytestmark = pytest.mark.skipif(
     bool(faltan), reason=f"el pipeline no ha corrido; faltan: {faltan[:3]}")
 
-VISTAS = ["Resumen", "Caracterización", "Modelos", "Oportunidad",
-          "Priorización", "Sesgo y supuestos"]
+VISTAS = ["Resumen", "Los clientes", "La solución", "La oportunidad",
+          "A quién contactar", "Supuestos y sesgos", "Cómo opera"]
 
 RUTA_APP = str(Path(__file__).resolve().parent.parent / "app" / "tablero.py")
 
@@ -65,7 +65,7 @@ def test_vista_renderiza_sin_excepcion(vista):
 
 def test_simulador_de_captura_responde():
     """El slider recalcula la oportunidad; no es decorativo."""
-    app = _abrir("Oportunidad")
+    app = _abrir("La oportunidad")
     app.slider[0].set_value(40).run()
     assert not _errores(app), _errores(app)
     assert any("40%" in m.label for m in app.metric), \
@@ -73,9 +73,22 @@ def test_simulador_de_captura_responde():
 
 
 def test_lista_de_contacto_es_descargable():
-    app = _abrir("Priorización")
+    app = _abrir("A quién contactar")
     assert not _errores(app), _errores(app)
     assert len(app.get("download_button")) == 1
+
+
+def test_cada_vista_abre_con_una_respuesta_en_lenguaje_llano():
+    """El tablero se sustenta ante público mixto: la conclusión va primero.
+
+    Si una vista pierde su bloque de respuesta, deja de servir a la mitad de
+    la audiencia sin que nada falle visiblemente.
+    """
+    for vista in VISTAS:
+        app = _abrir(vista)
+        textos = [m.value for m in app.markdown]
+        assert any('class="respuesta"' in t for t in textos), \
+            f"la vista «{vista}» no abre con una respuesta en lenguaje llano"
 
 
 def test_pipeline_a_medias_avisa_en_vez_de_reventar(tmp_path, monkeypatch):
@@ -104,7 +117,9 @@ def test_pipeline_a_medias_avisa_en_vez_de_reventar(tmp_path, monkeypatch):
     for f in (dat.csv, dat.jsonf, dat.base_clientes):
         f.clear()
     try:
-        completas = {"Resumen", "Oportunidad", "Priorización"}
+        # Las únicas tres vistas que no piden nada fuera del conjunto mínimo:
+        # «Cómo opera» es contenido explicativo y no lee artefactos.
+        completas = {"Resumen", "La oportunidad", "Cómo opera"}
         for vista in VISTAS:
             app = AppTest.from_file(RUTA_APP, default_timeout=400)
             app.run()

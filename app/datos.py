@@ -56,6 +56,20 @@ def base_clientes() -> pd.DataFrame:
     return datos
 
 
+def resumen_ejecutivo() -> dict:
+    return jsonf("eda/resumen_ejecutivo.json")
+
+
+def metricas_propension() -> dict:
+    return jsonf("models/metricas_propension.json")
+
+
+def tasa_base() -> float:
+    """Proporción de adoptantes en la base apta. Es la referencia contra la
+    que se lee cualquier otra tasa del tablero."""
+    return metricas_propension()["tasa_adopcion"]
+
+
 @st.cache_data
 def features_de(numero_id: str) -> pd.Series | None:
     """Fila de `cliente_features` de un cliente, para la ficha individual.

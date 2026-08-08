@@ -19,13 +19,6 @@ AMBAR = "#D9A441"
 GRIS = "#6B7280"
 GRIS_CLARO = "#D1D5DB"
 
-COLOR_BLOQUE = {
-    "crecimiento": VERDE,
-    "sin_senal": GRIS,
-    "riesgo_retiro": TERRACOTA,
-    "sin_monto_estimable": AZUL_CLARO,
-}
-
 CSS = f"""
 <style>
   /* Tarjetas de KPI: el borde de acento las separa del texto corrido sin
@@ -80,6 +73,28 @@ CSS = f"""
   }}
   .nota b, .cautela b {{ color: inherit; }}
   .pie {{ font-size: 0.82rem; color: {GRIS}; margin-top: -6px; }}
+
+  /* La respuesta en lenguaje llano que abre cada sección. Es lo primero que
+     lee alguien del negocio y muchas veces lo único que necesita. */
+  .respuesta {{
+      border-left: 5px solid {VERDE};
+      background: rgba(46, 139, 87, 0.08);
+      padding: 16px 20px;
+      border-radius: 0 5px 5px 0;
+      margin: 4px 0 18px 0;
+      font-size: 1.04rem;
+      line-height: 1.55;
+  }}
+  .respuesta .rotulo {{
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: {VERDE};
+      margin-bottom: 5px;
+  }}
+  .respuesta b {{ font-weight: 700; }}
 </style>
 """
 
@@ -119,6 +134,23 @@ def cautela(texto: str) -> None:
 
 def pie(texto: str) -> None:
     st.markdown(f'<div class="pie">{texto}</div>', unsafe_allow_html=True)
+
+
+def respuesta(texto: str, rotulo: str = "En corto") -> None:
+    """Respuesta en lenguaje llano, sin jerga, al inicio de cada sección.
+
+    El tablero se sustenta ante público mixto. Quien viene del negocio lee
+    esto y ya tiene la conclusión; quien viene de lo técnico sigue hacia el
+    detalle. Todo lo que exija vocabulario especializado va debajo, plegado.
+    """
+    st.markdown(
+        f'<div class="respuesta"><span class="rotulo">{rotulo}</span>{texto}</div>',
+        unsafe_allow_html=True)
+
+
+def detalle(titulo: str = "Cómo se calculó — detalle técnico"):
+    """Cajón plegado con el sustento. Devuelve el expander para usar con `with`."""
+    return st.expander(titulo)
 
 
 def barras_tasa(datos: pd.DataFrame, campo_cat: str, titulo_cat: str,
